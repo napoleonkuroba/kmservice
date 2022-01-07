@@ -3,7 +3,6 @@ package core
 import (
 	"github.com/go-xorm/xorm"
 	socketio "github.com/googollee/go-socket.io"
-	"github.com/kataras/iris/v12"
 	"github.com/sirupsen/logrus"
 	"net"
 )
@@ -38,9 +37,8 @@ type RegisterCenter struct {
 	ServiceCache        []MicroService         //缓存所有服务基本信息
 	ServiceActive       map[int64]int          //记录服务是否活跃
 
-	WebApp          *iris.Application //web服务器
-	WebSocketServer *socketio.Server  //websocket服务
-	Logger          *logrus.Logger    //日志管理
+	WebSocketServer *socketio.Server //websocket服务
+	Logger          *logrus.Logger   //日志管理
 
 	SocketPool  map[int64]net.Conn //TCP连接池
 	ConnNum     int                //当前维护连接数

@@ -3,8 +3,8 @@ package peer
 import (
 	"encoding/json"
 	"github.com/go-xorm/xorm"
+	"github.com/hducqa/kmservice/core"
 	"github.com/sirupsen/logrus"
-	"kmservice/core"
 	"math/rand"
 	"net"
 	"time"

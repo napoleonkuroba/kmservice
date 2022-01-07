@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/go-xorm/xorm"
 	socketio "github.com/googollee/go-socket.io"
-	"github.com/kataras/iris/v12"
 	"github.com/sirupsen/logrus"
 	"math/rand"
 	"net"
@@ -124,7 +123,6 @@ func NewCenter(sql *xorm.Engine, persistencePath string, logger *logrus.Logger, 
 		Subscribers:         make(map[string][]int64),
 		SQLClient:           sql,
 		ServiceCache:        make([]MicroService, 0),
-		WebApp:              iris.New(),
 		WebSocketServer:     socketio.NewServer(nil),
 		Logger:              logger,
 		SocketPool:          make(map[int64]net.Conn),
