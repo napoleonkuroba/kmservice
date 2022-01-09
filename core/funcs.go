@@ -171,7 +171,7 @@ func NewCenter(sql *xorm.Engine, persistencePath string, logger *logrus.Logger, 
 		poolsize = 100
 	}
 	_, err := os.Stat(persistencePath)
-	if err == nil {
+	if err != nil {
 		err = os.Mkdir(persistencePath, os.ModePerm)
 		if err != nil {
 			logger.Fatal(err.Error())
