@@ -11,7 +11,6 @@ import (
 	"math/rand"
 	"net"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 )
@@ -171,8 +170,13 @@ func NewCenter(sql *xorm.Engine, persistencePath string, logger *logrus.Logger, 
 	if poolsize <= 0 {
 		poolsize = 100
 	}
-	cmd := exec.Command("bash", "mkdir -p ", persistencePath)
-	err := cmd.Run()
+	_, err := os.Stat(persistencePath)
+	if err == nil {
+		err = os.Mkdir(persistencePath, os.ModePerm)
+		if err != nil {
+			logger.Fatal(err.Error())
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
