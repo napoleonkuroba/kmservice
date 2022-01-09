@@ -7,8 +7,11 @@ import (
 	"github.com/go-xorm/xorm"
 	socketio "github.com/googollee/go-socket.io"
 	"github.com/sirupsen/logrus"
+	"io/ioutil"
 	"math/rand"
 	"net"
+	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -26,16 +29,57 @@ func (r *RegisterCenter) LoadServices() error {
 	if err != nil {
 		return nil
 	}
-	r.ServiceCache = services
+	for _, service := range services {
+		r.ServiceCache[service.Id] = service
+	}
 	return nil
 }
 
-//TODO
+//
 //  Persistence
 //  @Description: 数据持久化
 //  @receiver r
 //
-func Persistence() error {
+func Persistence(data FileStorage, actualPath string) error {
+	bytes, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	f, err := os.OpenFile(actualPath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
+	defer f.Close()
+	if err != nil {
+		return err
+	}
+	n, _ := f.Seek(0, os.SEEK_END)
+	_, err = f.WriteAt(bytes, n)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+//
+//  Recovery
+//  @Description: 恢复持久化的数据
+//  @receiver r
+//
+func (r *RegisterCenter) Recovery() error {
+	file, err := os.Open(r.PersistenceFilePath)
+	defer file.Close()
+	if err != nil {
+		return err
+	}
+	bytes, err := ioutil.ReadAll(file)
+	if err != nil {
+		return err
+	}
+	var data FileStorage
+	err = json.Unmarshal(bytes, &data)
+	if err != nil {
+		return err
+	}
+	r.DataMap = data.DataMap
+	r.Subscribers = data.Subscribers
 	return nil
 }
 
@@ -92,6 +136,7 @@ func (r *RegisterCenter) Subscribe(subscriber int64, key string, tag int) (map[s
 	r.DataMap[key] = nil
 	r.Subscribers[key] = make([]int64, 0)
 	r.Subscribers[key] = append(r.Subscribers[key], subscriber)
+	r.PersistenceChannel <- r.PackageFile()
 	return nil, true
 }
 
@@ -103,34 +148,50 @@ func (r *RegisterCenter) Subscribe(subscriber int64, key string, tag int) (map[s
 //  @return *RegisterCenter
 //
 func NewCenter(sql *xorm.Engine, persistencePath string, logger *logrus.Logger, poolsize int) (*RegisterCenter, error) {
+	persistencePath = strings.ReplaceAll(persistencePath, " ", "")
 	if persistencePath == "" {
 		persistencePath = "./"
+	}
+	if persistencePath[len(persistencePath)-1:] != "/" {
+		persistencePath += "/"
 	}
 	if poolsize <= 0 {
 		poolsize = 100
 	}
-	err := sql.Sync2(new(MicroService))
+	cmd := exec.Command("bash", "mkdir -p ", persistencePath)
+	err := cmd.Run()
 	if err != nil {
 		return nil, err
 	}
-	err = Persistence()
+	persistencePath += "kmserver.db"
+	err = sql.Sync2(new(MicroService))
 	if err != nil {
 		return nil, err
 	}
-	return &RegisterCenter{
+	center := RegisterCenter{
 		PersistenceFilePath: persistencePath,
 		DataMap:             make(map[string]interface{}),
 		Subscribers:         make(map[string][]int64),
 		SQLClient:           sql,
-		ServiceCache:        make([]MicroService, 0),
+		ServiceCache:        make(map[int64]MicroService),
 		WebSocketServer:     socketio.NewServer(nil),
 		Logger:              logger,
 		SocketPool:          make(map[int64]net.Conn),
 		ConnNum:             0,
 		MaxPoolSize:         poolsize,
 		UpdateChannel:       make(chan UpdatePackage, 1000),
+		PersistenceChannel:  make(chan FileStorage, 1000),
 		RLocker:             make(map[string]bool),
-	}, nil
+	}
+	_, err = os.Stat(center.PersistenceFilePath)
+	if err == nil {
+		center.Recovery()
+	}
+	err = center.LoadServices()
+	if err != nil {
+		return nil, err
+	}
+	return &center, nil
 }
 
 //
@@ -139,6 +200,9 @@ func NewCenter(sql *xorm.Engine, persistencePath string, logger *logrus.Logger, 
 //  @receiver r
 //
 func (r *RegisterCenter) Run(port string) {
+	go r.SubscribeUpdate()
+	go r.PersistenceChannelData()
+	go r.TimingStatusCheck()
 	listen, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		r.Logger.Fatal(err.Error())
@@ -421,7 +485,20 @@ func (r *RegisterCenter) SubscribeUpdate() {
 				Tag:       "0",
 				ServiceId: 0})
 		}
+		r.PersistenceChannel <- r.PackageFile()
 		r.RLocker[update.Key] = false
+	}
+}
+
+//
+//  PersistenceChannelData
+//  @Description: 将更新数据写入文件
+//  @receiver r
+//
+func (r *RegisterCenter) PersistenceChannelData() {
+	for data := range r.PersistenceChannel {
+		err := Persistence(data, r.PersistenceFilePath)
+		r.Logger.Warning(err.Error())
 	}
 }
 
@@ -464,4 +541,18 @@ func (r *RegisterCenter) IsActive(id int64) {
 			Type: IsActive,
 		},
 	})
+}
+
+//
+//  TimingStatusCheck
+//  @Description: 定时检查服务是否活跃
+//  @receiver r
+//
+func (r *RegisterCenter) TimingStatusCheck() {
+	for {
+		time.Sleep(10 * time.Minute)
+		for id, _ := range r.ServiceCache {
+			r.IsActive(id)
+		}
+	}
 }

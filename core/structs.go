@@ -34,7 +34,7 @@ type RegisterCenter struct {
 	DataMap             map[string]interface{} //共享文件库
 	Subscribers         map[string][]int64     //订阅名单
 	SQLClient           *xorm.Engine           //数据库引擎
-	ServiceCache        []MicroService         //缓存所有服务基本信息
+	ServiceCache        map[int64]MicroService //缓存所有服务基本信息
 	ServiceActive       map[int64]int          //记录服务是否活跃
 
 	WebSocketServer *socketio.Server //websocket服务
@@ -44,8 +44,9 @@ type RegisterCenter struct {
 	ConnNum     int                //当前维护连接数
 	MaxPoolSize int                //最大连接数量
 
-	UpdateChannel chan UpdatePackage //数据更新通道
-	RLocker       map[string]bool    //读数据锁
+	PersistenceChannel chan FileStorage   //数据更新通道
+	UpdateChannel      chan UpdatePackage //数据更新通道
+	RLocker            map[string]bool    //读数据锁
 }
 
 type MicroService struct {
@@ -95,4 +96,16 @@ type Data struct {
 	Type string
 	Key  string
 	Body interface{}
+}
+
+type FileStorage struct {
+	DataMap     map[string]interface{} //共享文件库
+	Subscribers map[string][]int64     //订阅名单
+}
+
+func (r RegisterCenter) PackageFile() FileStorage {
+	return FileStorage{
+		DataMap:     r.DataMap,
+		Subscribers: r.Subscribers,
+	}
 }
