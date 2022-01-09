@@ -31,8 +31,8 @@ const (
 
 type RegisterCenter struct {
 	PersistenceFilePath string                 //持久化文件路径
-	DataMap             map[string]interface{} //共享文件库
-	Subscribers         map[string][]int64     //订阅名单
+	DataMap             map[int64]interface{}  //共享文件库
+	Subscribes          map[int64]Subscribe    //订阅名单
 	SQLClient           *xorm.Engine           //数据库引擎
 	ServiceCache        map[int64]MicroService //缓存所有服务基本信息
 	ServiceActive       map[int64]int          //记录服务是否活跃
@@ -46,7 +46,7 @@ type RegisterCenter struct {
 
 	PersistenceChannel chan FileStorage   //数据更新通道
 	UpdateChannel      chan UpdatePackage //数据更新通道
-	RLocker            map[string]bool    //读数据锁
+	RLocker            map[int64]bool     //读数据锁
 }
 
 type MicroService struct {
@@ -60,6 +60,13 @@ type MicroService struct {
 	IP           string   //服务启动IP地址
 	OwnerEmail   []string //管理者邮箱
 	Token        string   //服务密钥
+}
+
+type Subscribe struct {
+	Id          int64
+	Key         string
+	Subscribers []int64
+	Description string
 }
 
 type API struct {
@@ -88,24 +95,22 @@ type UpdatePackage struct {
 	Tag       string
 	ServiceId int64
 	From      net.Conn
-	Key       string
+	Key       int64
 	Request   UpdateRequset
 }
 
 type Data struct {
 	Type string
-	Key  string
+	Key  int64
 	Body interface{}
 }
 
 type FileStorage struct {
-	DataMap     map[string]interface{} //共享文件库
-	Subscribers map[string][]int64     //订阅名单
+	DataMap map[int64]interface{} //共享文件库
 }
 
 func (r RegisterCenter) PackageFile() FileStorage {
 	return FileStorage{
-		DataMap:     r.DataMap,
-		Subscribers: r.Subscribers,
+		DataMap: r.DataMap,
 	}
 }

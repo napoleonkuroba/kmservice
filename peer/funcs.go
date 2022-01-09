@@ -27,8 +27,8 @@ func NewPeer(center_ip string, center_port string, token string, id int64, name 
 		Token:       token,
 		ServiceId:   id,
 		ServiceName: name,
-		PeerData:    make(map[string]interface{}),
-		GetList:     make(map[string]bool),
+		PeerData:    make(map[int64]interface{}),
+		GetList:     make(map[int64]bool),
 		Logger:      logger,
 		SQLClient:   sql,
 	}
@@ -130,7 +130,7 @@ func (p *Peer) Listen() {
 
 		case core.GetDataFormException:
 			{
-				p.GetList = make(map[string]bool)
+				p.GetList = make(map[int64]bool)
 				p.DataGramLog(data)
 				break
 			}
@@ -138,13 +138,13 @@ func (p *Peer) Listen() {
 			{
 				go func() {
 					time.Sleep(5 * time.Second)
-					p.GetSubscribeData([]string{data.Data.Body.(string)})
+					p.GetSubscribeData([]int64{data.Data.Body.(int64)})
 				}()
 				break
 			}
 		case core.NoSubcribeInfo:
 			{
-				p.GetList[data.Data.Body.(string)] = false
+				p.GetList[data.Data.Body.(int64)] = false
 				p.DataGramLog(data)
 				break
 			}
@@ -161,7 +161,7 @@ func (p *Peer) Listen() {
 //  @receiver p
 //  @param key
 //
-func (p *Peer) GetSubscribeData(keys []string) error {
+func (p *Peer) GetSubscribeData(keys []int64) error {
 	apply := core.DataGram{
 		Data: core.Data{
 			Type: core.Get,
@@ -246,7 +246,7 @@ func (p *Peer) DataGramLog(data core.DataGram) {
 //  @param key
 //  @param new
 //
-func (p *Peer) UpdateRequest(key string, new interface{}) bool {
+func (p *Peer) UpdateRequest(key int64, new interface{}) bool {
 	if p.UpdateRequestList[key] != 0 {
 		return false
 	}
@@ -273,4 +273,17 @@ func (p *Peer) UpdateRequest(key string, new interface{}) bool {
 	}
 	p.UpdateRequestList[key] = 0
 	return true
+}
+
+//
+//  Run
+//  @Description: 运行节点
+//  @receiver p
+//
+func (p *Peer) Run() {
+	err := p.Connect()
+	if err != nil {
+		p.Logger.Fatal(err.Error())
+	}
+	p.Listen()
 }

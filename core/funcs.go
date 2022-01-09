@@ -12,7 +12,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -31,6 +30,24 @@ func (r *RegisterCenter) LoadServices() error {
 	}
 	for _, service := range services {
 		r.ServiceCache[service.Id] = service
+	}
+	return nil
+}
+
+//
+//  LoadSubscribes
+//  @Description: 从数据库中加载所有的订阅
+//  @receiver r
+//  @return error
+//
+func (r *RegisterCenter) LoadSubscribes() error {
+	subscribes := make([]Subscribe, 0)
+	err := r.SQLClient.Find(&subscribes)
+	if err != nil {
+		return nil
+	}
+	for _, subscribe := range subscribes {
+		r.Subscribes[subscribe.Id] = subscribe
 	}
 	return nil
 }
@@ -79,7 +96,6 @@ func (r *RegisterCenter) Recovery() error {
 		return err
 	}
 	r.DataMap = data.DataMap
-	r.Subscribers = data.Subscribers
 	return nil
 }
 
@@ -113,31 +129,28 @@ func (r *RegisterCenter) RegisterService(service MicroService) (string, error) {
 //  @param key	数据标签
 //  @param tag	订阅编号
 //
-func (r *RegisterCenter) Subscribe(subscriber int64, key string, tag int) (map[string][]int64, bool) {
-	if tag != 0 {
-		key = key + "-" + strconv.Itoa(tag)
-		_, exist := r.Subscribers[key]
-		if !exist {
-			r.Subscribers[key] = make([]int64, 0)
-		}
-		r.Subscribers[key] = append(r.Subscribers[key], subscriber)
-		return nil, true
+func (r *RegisterCenter) Subscribe(subscriber int64, id int64) error {
+	_, ok := r.Subscribes[id]
+	if !ok {
+		return errors.New("subscribe not exist")
 	}
-	sameTitle := make(map[string][]int64, 0)
-	for subkey, value := range r.Subscribers {
-		if strings.Contains(subkey, key) {
-			sameTitle[subkey] = value
-		}
+	subscribe := r.Subscribes[id]
+	subscribe.Subscribers = append(subscribe.Subscribers, subscriber)
+	_, err := r.SQLClient.Where("Id=?", id).Update(&subscribe)
+	if err != nil {
+		return err
 	}
-	if len(sameTitle) > 0 {
-		return sameTitle, false
-	}
-	key = key + "-" + strconv.Itoa(tag+1)
-	r.DataMap[key] = nil
-	r.Subscribers[key] = make([]int64, 0)
-	r.Subscribers[key] = append(r.Subscribers[key], subscriber)
-	r.PersistenceChannel <- r.PackageFile()
-	return nil, true
+	r.Subscribes[id] = subscribe
+	r.PushData(r.SocketPool[subscriber], DataGram{
+		Tag:       "0",
+		ServiceId: 0,
+		Data: Data{
+			Type: Update,
+			Key:  id,
+			Body: r.DataMap[id],
+		},
+	})
+	return nil
 }
 
 //
@@ -164,14 +177,14 @@ func NewCenter(sql *xorm.Engine, persistencePath string, logger *logrus.Logger, 
 		return nil, err
 	}
 	persistencePath += "kmserver.db"
-	err = sql.Sync2(new(MicroService))
+	err = sql.Sync2(new(MicroService), new(Subscribe))
 	if err != nil {
 		return nil, err
 	}
 	center := RegisterCenter{
 		PersistenceFilePath: persistencePath,
-		DataMap:             make(map[string]interface{}),
-		Subscribers:         make(map[string][]int64),
+		DataMap:             make(map[int64]interface{}),
+		Subscribes:          make(map[int64]Subscribe),
 		SQLClient:           sql,
 		ServiceCache:        make(map[int64]MicroService),
 		WebSocketServer:     socketio.NewServer(nil),
@@ -181,13 +194,17 @@ func NewCenter(sql *xorm.Engine, persistencePath string, logger *logrus.Logger, 
 		MaxPoolSize:         poolsize,
 		UpdateChannel:       make(chan UpdatePackage, 1000),
 		PersistenceChannel:  make(chan FileStorage, 1000),
-		RLocker:             make(map[string]bool),
+		RLocker:             make(map[int64]bool),
 	}
 	_, err = os.Stat(center.PersistenceFilePath)
 	if err == nil {
 		center.Recovery()
 	}
 	err = center.LoadServices()
+	if err != nil {
+		return nil, err
+	}
+	err = center.LoadSubscribes()
 	if err != nil {
 		return nil, err
 	}
@@ -312,6 +329,22 @@ func (r *RegisterCenter) SocketHandle(conn net.Conn) {
 //  @param conn
 //
 func (r *RegisterCenter) ConnectionListen(conn net.Conn, id int64) {
+	for key, value := range r.Subscribes {
+		for _, subscriber := range value.Subscribers {
+			if id == subscriber {
+				r.PushData(conn, DataGram{
+					Tag:       "0",
+					ServiceId: 0,
+					Data: Data{
+						Type: Update,
+						Key:  key,
+						Body: r.DataMap[key],
+					},
+				})
+				break
+			}
+		}
+	}
 	for {
 		buff := make([]byte, 1024)
 		length, err := conn.Read(buff)
@@ -365,7 +398,7 @@ func (r *RegisterCenter) HandleRequest(conn net.Conn, datagram DataGram, id int6
 		}
 	case Get:
 		{
-			keys, ok := datagram.Data.Body.([]string)
+			keys, ok := datagram.Data.Body.([]int64)
 			if !ok {
 				r.PushData(conn, DataGram{
 					Data: Data{
@@ -387,7 +420,7 @@ func (r *RegisterCenter) HandleRequest(conn net.Conn, datagram DataGram, id int6
 						ServiceId: datagram.ServiceId})
 					continue
 				}
-				subscribers := r.Subscribers[key]
+				subscribers := r.Subscribes[key].Subscribers
 				find := false
 				for _, subscriber := range subscribers {
 					if id == subscriber {
@@ -475,7 +508,7 @@ func (r *RegisterCenter) SubscribeUpdate() {
 			Tag:       update.Tag,
 			ServiceId: update.ServiceId,
 		})
-		for _, subscribe := range r.Subscribers[update.Key] {
+		for _, subscribe := range r.Subscribes[update.Key].Subscribers {
 			r.PushData(r.SocketPool[subscribe], DataGram{
 				Data: Data{
 					Type: Update,
