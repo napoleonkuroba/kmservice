@@ -52,29 +52,29 @@ type RegisterCenter struct {
 
 type MicroService struct {
 	Id           int64
-	Name         string   //服务名称
-	RootPath     string   //服务所在根目录
-	Language     string   //编码语言
-	StartCommand string   //服务启动命令
-	APIs         []API    //服务包含API内容
-	Ports        []string //服务启动端口
-	IP           string   //服务启动IP地址
-	OwnerEmail   []string //管理者邮箱
-	Token        string   //服务密钥
+	Name         string   `json:"name"`         //服务名称
+	RootPath     string   `json:"rootPath"`     //服务所在根目录
+	Language     string   `json:"language"`     //编码语言
+	StartCommand string   `json:"startCommand"` //服务启动命令
+	APIs         []API    `json:"APIs"`         //服务包含API内容
+	Ports        []string `json:"ports"`        //服务启动端口
+	IP           string   `json:"ip"`           //服务启动IP地址
+	OwnerEmail   []string `json:"ownerEmail"`   //管理者邮箱
+	Token        string   `json:"token"`        //服务密钥
 }
 
 type Subscribe struct {
 	Id          int64
-	Key         string
-	Subscribers []int64
-	Writers     []int64
-	Description string
+	Key         string  `json:"key"`
+	Subscribers []int64 `json:"subscribers"`
+	Writers     []int64 `json:"writers"`
+	Description string  `json:"description"`
 }
 
 type API struct {
-	Protocol    string //API协议
-	Route       string //路由
-	RequestType string
+	Protocol    string `json:"protocol"` //API协议
+	Route       string `json:"route"`    //路由
+	RequestType string `json:"requestType"`
 }
 
 type ConnApply struct {
