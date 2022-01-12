@@ -125,8 +125,7 @@ func (r *RegisterCenter) RegisterService(service MicroService) (string, error) {
 //  @Description: 订阅公共数据
 //  @receiver r
 //  @param Subscriber	订阅人/服务
-//  @param key	数据标签
-//  @param tag	订阅编号
+//  @param id	订阅编号
 //
 func (r *RegisterCenter) Subscribe(subscriber int64, id int64) error {
 	_, ok := r.Subscribes[id]
@@ -140,15 +139,105 @@ func (r *RegisterCenter) Subscribe(subscriber int64, id int64) error {
 		return err
 	}
 	r.Subscribes[id] = subscribe
-	r.PushData(r.SocketPool[subscriber], DataGram{
-		Tag:       "0",
-		ServiceId: 0,
-		Data: Data{
-			Type: Update,
-			Key:  id,
-			Body: r.DataMap[id],
-		},
-	})
+	_, ok = r.SocketPool[subscriber]
+	if ok {
+		r.PushData(r.SocketPool[subscriber], DataGram{
+			Tag:       "0",
+			ServiceId: 0,
+			Data: Data{
+				Type: Update,
+				Key:  id,
+				Body: r.DataMap[id],
+			},
+		})
+	}
+	return nil
+}
+
+//
+//  CancelSubscribe
+//  @Description: 取消订阅
+//  @receiver r
+//  @param subscriber
+//  @param id
+//  @return error
+//
+func (r *RegisterCenter) CancelSubscribe(subscriber int64, id int64) error {
+	_, ok := r.Subscribes[id]
+	if !ok {
+		return errors.New("subscribe not exist")
+	}
+	subscribe := r.Subscribes[id]
+	for i, subscriberid := range subscribe.Subscribers {
+		if subscriberid == subscriber {
+			if len(subscribe.Subscribers) == 1 {
+				subscribe.Subscribers = make([]int64, 0)
+			} else {
+				subscribe.Subscribers = append(subscribe.Subscribers[:i], subscribe.Subscribers[i+1:]...)
+			}
+			break
+		}
+	}
+	_, err := r.SQLClient.Where("Id=?", id).Update(&subscribe)
+	if err != nil {
+		return err
+	}
+	r.Subscribes[id] = subscribe
+	return nil
+}
+
+//
+//  WriteApply
+//  @Description: 申请订阅写权限
+//  @receiver r
+//  @param subscriber 申请人
+//  @param id	订阅编号
+//  @return error
+//
+func (r *RegisterCenter) WriteApply(writer int64, id int64) error {
+	_, ok := r.Subscribes[id]
+	if !ok {
+		return errors.New("subscribe not exist")
+	}
+	subscribe := r.Subscribes[id]
+	subscribe.Writers = append(subscribe.Writers, writer)
+	_, err := r.SQLClient.Where("Id=?", id).Update(&subscribe)
+	if err != nil {
+		return err
+	}
+	r.Subscribes[id] = subscribe
+	return nil
+}
+
+//
+//  CancelWrite
+//  @Description: 取消写权限
+//  @receiver r
+//  @param writer
+//  @param id
+//  @return error
+//
+func (r *RegisterCenter) CancelWrite(writer int64, id int64) error {
+	_, ok := r.Subscribes[id]
+	if !ok {
+		return errors.New("subscribe not exist")
+	}
+	subscribe := r.Subscribes[id]
+	for i, writerid := range subscribe.Writers {
+		if writerid == writer {
+			if len(subscribe.Writers) == 1 {
+				subscribe.Writers = make([]int64, 0)
+			} else {
+				subscribe.Writers = append(subscribe.Writers[:i], subscribe.Writers[i+1:]...)
+			}
+			break
+		}
+	}
+	_, err := r.SQLClient.Where("Id=?", id).Update(&subscribe)
+	if err != nil {
+		return err
+	}
+	r.Subscribes[id] = subscribe
 	return nil
 }
 
@@ -388,15 +477,30 @@ func (r *RegisterCenter) HandleRequest(conn net.Conn, datagram DataGram, id int6
 					ServiceId: datagram.ServiceId})
 				return
 			}
-			r.UpdateChannel <- UpdatePackage{
-				Tag:       datagram.Tag,
-				ServiceId: datagram.ServiceId,
-				From:      conn,
-				Key:       datagram.Data.Key,
-				Request: UpdateRequset{
-					Origin: data.Origin,
-					New:    data.New,
-				},
+			find := false
+			for _, writer := range r.Subscribes[datagram.Data.Key].Writers {
+				if id == writer {
+					r.UpdateChannel <- UpdatePackage{
+						Tag:       datagram.Tag,
+						ServiceId: datagram.ServiceId,
+						From:      conn,
+						Key:       datagram.Data.Key,
+						Request: UpdateRequset{
+							Origin: data.Origin,
+							New:    data.New,
+						},
+					}
+					find = true
+					break
+				}
+			}
+			if !find {
+				r.PushData(conn, DataGram{
+					Data: Data{
+						Type: WithoutPermission,
+						Body: nil,
+					},
+					Tag: datagram.Tag, ServiceId: datagram.ServiceId})
 			}
 			return
 		}
@@ -592,4 +696,35 @@ func (r *RegisterCenter) TimingStatusCheck() {
 			r.IsActive(id)
 		}
 	}
+}
+
+//
+//  GetServicePrivileges
+//  @Description: 获取订阅人拥有的权限
+//  @receiver r
+//  @param subscriber	订阅人id
+//  @return map[int64]SubscribePrivilege
+//
+func (r RegisterCenter) GetServicePrivileges(subscriber int64) map[int64]SubscribePrivilege {
+	result := make(map[int64]SubscribePrivilege)
+	for key, value := range r.Subscribes {
+		privilege := SubscribePrivilege{
+			Read:  false,
+			Write: false,
+		}
+		for _, reader := range value.Subscribers {
+			if subscriber == reader {
+				privilege.Read = true
+				break
+			}
+		}
+		for _, writer := range value.Writers {
+			if subscriber == writer {
+				privilege.Write = true
+				break
+			}
+		}
+		result[key] = privilege
+	}
+	return result
 }

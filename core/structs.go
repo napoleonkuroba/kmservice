@@ -27,6 +27,7 @@ const (
 	KeyNotExist             = "KeyNotExist"
 	NoSubcribeInfo          = "NoSubcribeInfo"
 	DataLocked              = "DataLocked"
+	WithoutPermission       = "WithoutPermission"
 )
 
 type RegisterCenter struct {
@@ -66,6 +67,7 @@ type Subscribe struct {
 	Id          int64
 	Key         string
 	Subscribers []int64
+	Writers     []int64
 	Description string
 }
 
@@ -107,6 +109,11 @@ type Data struct {
 
 type FileStorage struct {
 	DataMap map[int64]interface{} //共享文件库
+}
+
+type SubscribePrivilege struct {
+	Read  bool
+	Write bool
 }
 
 func (r RegisterCenter) PackageFile() FileStorage {

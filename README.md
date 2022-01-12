@@ -1,1 +1,1 @@
-### go get github.com/hducqa/kmservice
+### go get github.com/hducqa/kmservice@v0.0.7
