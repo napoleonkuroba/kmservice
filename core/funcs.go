@@ -121,6 +121,103 @@ func (r *RegisterCenter) RegisterService(service MicroService) (string, error) {
 }
 
 //
+//  UpdateServiceInfo
+//  @Description: 更新服务信息
+//  @receiver r
+//  @param service
+//  @return error
+//
+func (r *RegisterCenter) UpdateServiceInfo(service MicroService) error {
+	_, err := r.SQLClient.Where("Id=?", service.Id).Update(&service)
+	if err != nil {
+		return err
+	}
+	go r.LoadServices()
+	return nil
+}
+
+//
+//  DeleteService
+//  @Description: 删除服务
+//  @receiver r
+//  @param id
+//  @return error
+//
+func (r *RegisterCenter) DeleteService(id int64) error {
+	service := MicroService{Id: id}
+	_, err := r.SQLClient.Delete(&service)
+	if err != nil {
+		return err
+	}
+	subscribes := make([]Subscribe, 0)
+	err = r.SQLClient.Find(&subscribes)
+	if err != nil {
+		return err
+	}
+	for _, subscribe := range subscribes {
+		changed := false
+		for i, reader := range subscribe.Subscribers {
+			if reader == id {
+				if len(subscribe.Subscribers) == 1 {
+					subscribe.Subscribers = make([]int64, 0)
+				} else {
+					subscribe.Subscribers = append(subscribe.Subscribers[:i], subscribe.Subscribers[i+1:]...)
+				}
+				changed = true
+				break
+			}
+		}
+		for i, writer := range subscribe.Writers {
+			if writer == id {
+				if len(subscribe.Writers) == 1 {
+					subscribe.Writers = make([]int64, 0)
+				} else {
+					subscribe.Writers = append(subscribe.Writers[:i], subscribe.Writers[i+1:]...)
+				}
+				changed = true
+			}
+		}
+		if changed {
+			_, err = r.SQLClient.Where("Id=?", subscribe.Id).Update(&subscribe)
+			if err != nil {
+				r.Logger.Warning(err.Error())
+			}
+		}
+	}
+	_, ok := r.SocketPool[service.Id]
+	if ok {
+		conn := r.SocketPool[service.Id]
+		if conn != nil {
+			conn.Close()
+			r.SocketPool[service.Id] = nil
+		}
+	}
+	r.ServiceActive[service.Id] = 0
+	r.LoadServices()
+	r.LoadSubscribes()
+	return nil
+}
+
+//
+//  DeleteSubscribe
+//  @Description: 删除订阅
+//  @receiver r
+//  @param id
+//  @return error
+//
+func (r *RegisterCenter) DeleteSubscribe(id int64) error {
+	subscribe := Subscribe{Id: id}
+	_, err := r.SQLClient.Delete(&subscribe)
+	if err != nil {
+		return err
+	}
+	delete(r.Subscribes, id)
+	delete(r.DataMap, id)
+	delete(r.RLocker, id)
+	return nil
+}
+
+//
 //  Subscribe
 //  @Description: 订阅公共数据
 //  @receiver r
