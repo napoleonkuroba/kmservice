@@ -145,7 +145,6 @@ func (r *RegisterCenter) UpdateServiceInfo(service MicroService) error {
 //
 func (r *RegisterCenter) DeleteService(id int64) error {
 	service := MicroService{Id: id}
-	r.SQLClient.Get(&service)
 	_, err := r.SQLClient.Delete(service)
 	if err != nil {
 		return err
@@ -208,7 +207,6 @@ func (r *RegisterCenter) DeleteService(id int64) error {
 //
 func (r *RegisterCenter) DeleteSubscribe(id int64) error {
 	subscribe := Subscribe{Id: id}
-	r.SQLClient.Get(&subscribe)
 	_, err := r.SQLClient.Delete(subscribe)
 	if err != nil {
 		return err
