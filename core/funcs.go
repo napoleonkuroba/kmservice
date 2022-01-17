@@ -137,6 +137,22 @@ func (r *RegisterCenter) UpdateServiceInfo(service MicroService) error {
 }
 
 //
+//  UpdateSubscribeInfo
+//  @Description: 更新订阅信息
+//  @receiver r
+//  @param subscribe
+//  @return error
+//
+func (r *RegisterCenter) UpdateSubscribeInfo(subscribe Subscribe) error {
+	_, err := r.SQLClient.Where("Id=?", subscribe.Id).Update(&subscribe)
+	if err != nil {
+		return err
+	}
+	go r.LoadSubscribes()
+	return nil
+}
+
+//
 //  DeleteService
 //  @Description: 删除服务
 //  @receiver r
