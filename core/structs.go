@@ -5,6 +5,7 @@ import (
 	socketio "github.com/googollee/go-socket.io"
 	"github.com/sirupsen/logrus"
 	"net"
+	"time"
 )
 
 const (
@@ -13,6 +14,7 @@ const (
 	Success = "success"
 	Failure = "failure"
 	Get     = "get"
+	APIlist = "APIlist"
 
 	Active  = 1
 	Pending = -1
@@ -22,6 +24,7 @@ const (
 	UpdateSuccess           = "UpdateSuccess"
 	OriginalDataExpired     = "OriginalDataExpired"
 	UpdateDataFormException = "UpdateDataFormException"
+	APIsDataFormException   = "APIsDataFormException"
 	GetDataFormException    = "GetDataFormException"
 	RequestTypeException    = "RequestTypeException"
 	KeyNotExist             = "KeyNotExist"
@@ -51,7 +54,7 @@ type RegisterCenter struct {
 }
 
 type MicroService struct {
-	Id           int64
+	Id           int64    `json:"id"`
 	Name         string   `json:"name"`         //服务名称
 	RootPath     string   `json:"rootPath"`     //服务所在根目录
 	Language     string   `json:"language"`     //编码语言
@@ -64,7 +67,7 @@ type MicroService struct {
 }
 
 type Subscribe struct {
-	Id          int64
+	Id          int64   `json:"id"`
 	Key         string  `json:"key"`
 	Subscribers []int64 `json:"subscribers"`
 	Writers     []int64 `json:"writers"`
@@ -102,9 +105,10 @@ type UpdatePackage struct {
 }
 
 type Data struct {
-	Type string
-	Key  int64
-	Body interface{}
+	Type      string
+	Key       int64
+	TimeStamp time.Time
+	Body      interface{}
 }
 
 type FileStorage struct {

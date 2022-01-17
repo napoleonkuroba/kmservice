@@ -103,7 +103,8 @@ func (p *Peer) Listen() {
 					Tag:       p.CreateTag(),
 					ServiceId: p.ServiceId,
 					Data: core.Data{
-						Type: core.IsActive,
+						TimeStamp: time.Now(),
+						Type:      core.IsActive,
 					},
 				})
 				break
@@ -164,8 +165,9 @@ func (p *Peer) Listen() {
 func (p *Peer) GetSubscribeData(keys []int64) error {
 	apply := core.DataGram{
 		Data: core.Data{
-			Type: core.Get,
-			Body: keys,
+			TimeStamp: time.Now(),
+			Type:      core.Get,
+			Body:      keys,
 		},
 		ServiceId: p.ServiceId,
 		Tag:       p.CreateTag(),
@@ -258,9 +260,10 @@ func (p *Peer) UpdateRequest(key int64, new interface{}) bool {
 		Tag:       p.CreateTag(),
 		ServiceId: p.ServiceId,
 		Data: core.Data{
-			Type: core.Update,
-			Key:  key,
-			Body: update,
+			TimeStamp: time.Now(),
+			Type:      core.Update,
+			Key:       key,
+			Body:      update,
 		},
 	})
 	p.UpdateRequestList[key] = 1
@@ -273,6 +276,23 @@ func (p *Peer) UpdateRequest(key int64, new interface{}) bool {
 	}
 	p.UpdateRequestList[key] = 0
 	return true
+}
+
+//
+//  SendWebAPIs
+//  @Description: 向中心节点发送服务接口列表
+//  @receiver p
+//
+func (p *Peer) SendWebAPIs(apis []core.API) {
+	p.PushData(core.DataGram{
+		Tag:       p.CreateTag(),
+		ServiceId: p.ServiceId,
+		Data: core.Data{
+			Type:      core.APIlist,
+			TimeStamp: time.Now(),
+			Body:      apis,
+		},
+	})
 }
 
 //
