@@ -117,6 +117,7 @@ func (r *RegisterCenter) RegisterService(service MicroService) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	r.LoadServices()
 	return token, nil
 }
 
@@ -256,7 +257,7 @@ func (r *RegisterCenter) Subscribe(subscriber int64, id int64) error {
 	if err != nil {
 		return err
 	}
-	r.Subscribes[id] = subscribe
+	r.LoadSubscribes()
 	_, ok = r.SocketPool[subscriber]
 	if ok {
 		r.PushData(r.SocketPool[subscriber], DataGram{
