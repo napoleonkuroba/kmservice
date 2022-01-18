@@ -102,7 +102,7 @@ func (r *RegisterCenter) Recovery() error {
 //  RegisterService
 //  @Description: 注册服务
 //  @receiver r
-//  @param service
+//  @param service 服务内容
 //
 func (r *RegisterCenter) RegisterService(service MicroService) (string, error) {
 	rand := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -124,7 +124,7 @@ func (r *RegisterCenter) RegisterService(service MicroService) (string, error) {
 //  UpdateServiceInfo
 //  @Description: 更新服务信息
 //  @receiver r
-//  @param service
+//  @param service 更新内容
 //  @return error
 //
 func (r *RegisterCenter) UpdateServiceInfo(service MicroService) error {
@@ -140,7 +140,7 @@ func (r *RegisterCenter) UpdateServiceInfo(service MicroService) error {
 //  UpdateSubscribeInfo
 //  @Description: 更新订阅信息
 //  @receiver r
-//  @param subscribe
+//  @param subscribe 更新内容
 //  @return error
 //
 func (r *RegisterCenter) UpdateSubscribeInfo(subscribe Subscribe) error {
@@ -156,7 +156,7 @@ func (r *RegisterCenter) UpdateSubscribeInfo(subscribe Subscribe) error {
 //  DeleteService
 //  @Description: 删除服务
 //  @receiver r
-//  @param id
+//  @param id 删除服务id
 //  @return error
 //
 func (r *RegisterCenter) DeleteService(id int64) error {
@@ -218,7 +218,7 @@ func (r *RegisterCenter) DeleteService(id int64) error {
 //  DeleteSubscribe
 //  @Description: 删除订阅
 //  @receiver r
-//  @param id
+//  @param id 删除订阅id
 //  @return error
 //
 func (r *RegisterCenter) DeleteSubscribe(id int64) error {
@@ -246,6 +246,11 @@ func (r *RegisterCenter) Subscribe(subscriber int64, id int64) error {
 		return errors.New("subscribe not exist")
 	}
 	subscribe := r.Subscribes[id]
+	for _, subscriberId := range subscribe.Subscribers {
+		if subscriber == subscriberId {
+			return nil
+		}
+	}
 	subscribe.Subscribers = append(subscribe.Subscribers, subscriber)
 	_, err := r.SQLClient.Where("Id=?", id).Update(&subscribe)
 	if err != nil {
@@ -272,8 +277,8 @@ func (r *RegisterCenter) Subscribe(subscriber int64, id int64) error {
 //  CancelSubscribe
 //  @Description: 取消订阅
 //  @receiver r
-//  @param subscriber
-//  @param id
+//  @param subscriber 订阅者id
+//  @param id 订阅id
 //  @return error
 //
 func (r *RegisterCenter) CancelSubscribe(subscriber int64, id int64) error {
@@ -282,6 +287,7 @@ func (r *RegisterCenter) CancelSubscribe(subscriber int64, id int64) error {
 		return errors.New("subscribe not exist")
 	}
 	subscribe := r.Subscribes[id]
+	changed := false
 	for i, subscriberid := range subscribe.Subscribers {
 		if subscriberid == subscriber {
 			if len(subscribe.Subscribers) == 1 {
@@ -289,8 +295,12 @@ func (r *RegisterCenter) CancelSubscribe(subscriber int64, id int64) error {
 			} else {
 				subscribe.Subscribers = append(subscribe.Subscribers[:i], subscribe.Subscribers[i+1:]...)
 			}
+			changed = true
 			break
 		}
+	}
+	if !changed {
+		return nil
 	}
 	_, err := r.SQLClient.Where("Id=?", id).Update(&subscribe)
 	if err != nil {
@@ -314,6 +324,11 @@ func (r *RegisterCenter) WriteApply(writer int64, id int64) error {
 		return errors.New("subscribe not exist")
 	}
 	subscribe := r.Subscribes[id]
+	for _, writerId := range subscribe.Writers {
+		if writerId == writer {
+			return nil
+		}
+	}
 	subscribe.Writers = append(subscribe.Writers, writer)
 	_, err := r.SQLClient.Where("Id=?", id).Update(&subscribe)
 	if err != nil {
@@ -327,8 +342,8 @@ func (r *RegisterCenter) WriteApply(writer int64, id int64) error {
 //  CancelWrite
 //  @Description: 取消写权限
 //  @receiver r
-//  @param writer
-//  @param id
+//  @param writer	服务id
+//  @param id	订阅id
 //  @return error
 //
 func (r *RegisterCenter) CancelWrite(writer int64, id int64) error {
