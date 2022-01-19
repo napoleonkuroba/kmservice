@@ -588,7 +588,7 @@ func (r *RegisterCenter) ConnectionListen(conn net.Conn, id int64) {
 			return
 		}
 		var datagram DataGram
-		err = json.Unmarshal(buff[:length], datagram)
+		err = json.Unmarshal(buff[:length], &datagram)
 		if err != nil {
 			r.Logger.Error(err.Error())
 			return
