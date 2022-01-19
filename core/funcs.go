@@ -650,7 +650,7 @@ func (r *RegisterCenter) HandleRequest(conn net.Conn, datagram DataGram, id int6
 		}
 	case Get:
 		{
-			datas, ok := datagram.Data.Body.([]interface{})
+			keys, ok := datagram.Data.Body.([]int64)
 			if !ok {
 				r.PushData(conn, DataGram{
 					Data: Data{
@@ -660,10 +660,6 @@ func (r *RegisterCenter) HandleRequest(conn net.Conn, datagram DataGram, id int6
 					},
 					Tag: datagram.Tag, ServiceId: datagram.ServiceId})
 				return
-			}
-			keys := make([]int64, 0)
-			for _, data := range datas {
-				keys = append(keys, data.(int64))
 			}
 			for _, key := range keys {
 				_, ok = r.DataMap[key]
@@ -729,11 +725,7 @@ func (r *RegisterCenter) HandleRequest(conn net.Conn, datagram DataGram, id int6
 		}
 	case APIlist:
 		{
-			datas, ok := datagram.Data.Body.([]interface{})
-			apis := make([]API, 0)
-			for _, data := range datas {
-				apis = append(apis, data.(API))
-			}
+			datas, ok := datagram.Data.Body.([]byte)
 			if !ok {
 				r.PushData(conn, DataGram{
 					Data: Data{
@@ -745,10 +737,17 @@ func (r *RegisterCenter) HandleRequest(conn net.Conn, datagram DataGram, id int6
 					ServiceId: datagram.ServiceId})
 				return
 			}
+			apis := make([]API, 0)
+			err := json.Unmarshal(datas, &apis)
+			if err != nil {
+				r.Logger.Error(err.Error())
+			}
 			service := MicroService{Id: id, APIs: apis}
 			r.SQLClient.Where("Id=?", id).Update(&service)
 			r.LoadServices()
+			return
 		}
+
 	}
 	r.PushData(conn, DataGram{
 		Data: Data{
