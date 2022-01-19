@@ -122,6 +122,22 @@ func (r *RegisterCenter) RegisterService(service MicroService) (string, error) {
 }
 
 //
+//  CreateSubscribe
+//  @Description: 创建订阅
+//  @receiver r
+//  @param subscribe
+//  @return error
+//
+func (r *RegisterCenter) CreateSubscribe(subscribe Subscribe) error {
+	_, err := r.SQLClient.Insert(&subscribe)
+	if err != nil {
+		return err
+	}
+	r.LoadSubscribes()
+	return nil
+}
+
+//
 //  UpdateServiceInfo
 //  @Description: 更新服务信息
 //  @receiver r
@@ -823,6 +839,8 @@ func (r *RegisterCenter) PushData(conn net.Conn, data DataGram) error {
 	}
 	_, err = conn.Write(bytes)
 	if err != nil {
+		r.ServiceActive[data.ServiceId] = Stop
+		conn.Close()
 		return err
 	}
 	return nil
