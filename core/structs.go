@@ -77,7 +77,8 @@ type API struct {
 	Protocol    string `json:"protocol"` //API协议
 	Route       string `json:"route"`    //路由
 	RequestType string `json:"requestType"`
-	Port        string `json:"port"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
 type ConnApply struct {
