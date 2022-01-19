@@ -285,17 +285,13 @@ func (p *Peer) UpdateRequest(key int64, new interface{}) bool {
 //  @receiver p
 //
 func (p *Peer) SendWebAPIs(apis []core.API) {
-	dataBytes, err := json.Marshal(apis)
-	if err != nil {
-		p.Logger.Panic(err.Error())
-	}
 	p.PushData(core.DataGram{
 		Tag:       p.CreateTag(),
 		ServiceId: p.ServiceId,
 		Data: core.Data{
 			Type:      core.APIlist,
 			TimeStamp: time.Now(),
-			Body:      dataBytes,
+			Body:      apis,
 		},
 	})
 }

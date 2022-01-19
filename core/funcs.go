@@ -725,7 +725,7 @@ func (r *RegisterCenter) HandleRequest(conn net.Conn, datagram DataGram, id int6
 		}
 	case APIlist:
 		{
-			datas, ok := datagram.Data.Body.([]byte)
+			datas, ok := datagram.Data.Body.([]interface{})
 			if !ok {
 				r.PushData(conn, DataGram{
 					Data: Data{
@@ -738,10 +738,21 @@ func (r *RegisterCenter) HandleRequest(conn net.Conn, datagram DataGram, id int6
 				return
 			}
 			apis := make([]API, 0)
-			err := json.Unmarshal(datas, &apis)
-			if err != nil {
-				r.Logger.Error(err.Error())
+			for _, data := range datas {
+				bytes, err := json.Marshal(data)
+				if err != nil {
+					r.Logger.Error(err.Error())
+					break
+				}
+				var api API
+				err = json.Unmarshal(bytes, &api)
+				if err != nil {
+					r.Logger.Error(err.Error())
+					break
+				}
+				apis = append(apis, api)
 			}
+
 			service := MicroService{Id: id, APIs: apis}
 			r.SQLClient.Where("Id=?", id).Update(&service)
 			r.LoadServices()
