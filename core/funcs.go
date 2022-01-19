@@ -543,6 +543,7 @@ func (r *RegisterCenter) SocketHandle(conn net.Conn) {
 		r.ServiceActive[service.Id] = Active
 		r.ConnNum++
 		go r.ConnectionListen(conn, service.Id)
+		return
 	}
 	r.PushData(conn, DataGram{
 		Data: Data{
