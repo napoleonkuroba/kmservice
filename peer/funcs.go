@@ -85,7 +85,7 @@ func (p *Peer) Connect() error {
 //
 func (p *Peer) Listen() {
 	for {
-		buff := make([]byte, 1024)
+		buff := make([]byte, 409600)
 		length, err := p.Connection.Read(buff)
 		if err != nil {
 			p.Logger.Error(err.Error())

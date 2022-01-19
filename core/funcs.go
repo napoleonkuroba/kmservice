@@ -487,7 +487,7 @@ func (r *RegisterCenter) Run(port string) {
 //  @param conn	连接对象
 //
 func (r *RegisterCenter) SocketHandle(conn net.Conn) {
-	buff := make([]byte, 1024)
+	buff := make([]byte, 2048)
 	length, err := conn.Read(buff)
 	if err != nil {
 		r.Logger.Error(err.Error())
@@ -581,7 +581,7 @@ func (r *RegisterCenter) ConnectionListen(conn net.Conn, id int64) {
 		}
 	}
 	for {
-		buff := make([]byte, 1024)
+		buff := make([]byte, 409600)
 		length, err := conn.Read(buff)
 		if err != nil {
 			r.Logger.Error(err.Error())
