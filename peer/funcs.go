@@ -72,6 +72,7 @@ func (p *Peer) Connect() error {
 	}
 	if data.Data.Type == core.Success {
 		p.Connection = conn
+		return nil
 	}
 	return data.Data.Body.(error)
 }

@@ -501,18 +501,6 @@ func (r *RegisterCenter) SocketHandle(conn net.Conn) {
 		conn.Close()
 		return
 	}
-	connSuccess := DataGram{
-		Data: Data{
-			TimeStamp: time.Now(),
-			Type:      Success,
-		},
-	}
-	bytes, err := json.Marshal(connSuccess)
-	if err != nil {
-		conn.Close()
-		return
-	}
-	conn.Write(bytes)
 
 	//从数据库中获取服务的注册信息
 	service := MicroService{Id: apply.Id}
