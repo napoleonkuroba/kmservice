@@ -460,6 +460,7 @@ func (r *RegisterCenter) Run(port string) {
 	go r.SubscribeUpdate()
 	go r.PersistenceChannelData()
 	go r.TimingStatusCheck()
+	go r.Recovery()
 	listen, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		r.Logger.Fatal(err.Error())
