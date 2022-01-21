@@ -856,7 +856,9 @@ func (r *RegisterCenter) SubscribeUpdate() {
 func (r *RegisterCenter) PersistenceChannelData() {
 	for data := range r.PersistenceChannel {
 		err := Persistence(data, r.PersistenceFilePath)
-		r.Logger.Warning(err.Error())
+		if err != nil {
+			r.Logger.Warning(err.Error())
+		}
 	}
 }
 
