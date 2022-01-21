@@ -22,15 +22,17 @@ import (
 func NewPeer(center_ip string, center_port string, token string, id int64, name string, sql *xorm.Engine, logger *logrus.Logger) *Peer {
 	sql.Sync2(new(DataGramStorage))
 	return &Peer{
-		CenterIP:    center_ip,
-		CenterPort:  center_port,
-		Token:       token,
-		ServiceId:   id,
-		ServiceName: name,
-		PeerData:    make(map[int64]interface{}),
-		GetList:     make(map[int64]bool),
-		Logger:      logger,
-		SQLClient:   sql,
+		CenterIP:          center_ip,
+		CenterPort:        center_port,
+		Token:             token,
+		ServiceId:         id,
+		ServiceName:       name,
+		PeerData:          make(map[int64]interface{}),
+		GetList:           make(map[int64]bool),
+		UpdateRequestList: make(map[int64]int),
+		Logger:            logger,
+		SQLClient:         sql,
+		Connection:        nil,
 	}
 }
 
