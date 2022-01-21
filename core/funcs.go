@@ -841,6 +841,7 @@ func (r *RegisterCenter) PersistenceChannelData() {
 //  @param data
 //
 func (r *RegisterCenter) PushData(conn net.Conn, data DataGram) error {
+	r.Logger.Info("send : ", data)
 	bytes, err := json.Marshal(&data)
 	if err != nil {
 		return err

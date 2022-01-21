@@ -90,7 +90,7 @@ func (p *Peer) Listen() {
 		buff := make([]byte, 409600)
 		length, err := p.Connection.Read(buff)
 		if err != nil {
-			p.Logger.Error(err.Error())
+			p.Logger.Panic(err.Error())
 			continue
 		}
 		var data core.DataGram
@@ -99,6 +99,7 @@ func (p *Peer) Listen() {
 			p.Logger.Error(err.Error())
 			continue
 		}
+		p.Logger.Info("received : ", data)
 		switch data.Data.Type {
 		case core.IsActive:
 			{
