@@ -21,7 +21,9 @@ type Peer struct {
 	Logger    *logrus.Logger
 	SQLClient *xorm.Engine
 
-	Connection net.Conn
+	MaxErrorTimes int
+	Connection    net.Conn
+	ErrorTimes    int
 }
 
 type DataGramStorage struct {

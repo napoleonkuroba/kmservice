@@ -19,7 +19,7 @@ import (
 //  @param logger
 //  @return *Peer
 //
-func NewPeer(center_ip string, center_port string, token string, id int64, name string, sql *xorm.Engine, logger *logrus.Logger) *Peer {
+func NewPeer(center_ip string, center_port string, token string, id int64, name string, sql *xorm.Engine, logger *logrus.Logger, maxerrorTimes int) *Peer {
 	sql.Sync2(new(DataGramStorage))
 	return &Peer{
 		CenterIP:          center_ip,
@@ -32,7 +32,9 @@ func NewPeer(center_ip string, center_port string, token string, id int64, name 
 		UpdateRequestList: make(map[int64]int),
 		Logger:            logger,
 		SQLClient:         sql,
+		MaxErrorTimes:     maxerrorTimes,
 		Connection:        nil,
+		ErrorTimes:        10,
 	}
 }
 
@@ -87,19 +89,25 @@ func (p *Peer) Connect() error {
 //
 func (p *Peer) Listen() {
 	for {
+		if p.ErrorTimes == 0 {
+			return
+		}
 		buff := make([]byte, 409600)
 		length, err := p.Connection.Read(buff)
 		if err != nil {
-			p.Logger.Panic(err.Error())
+			p.Logger.Error(err.Error())
+			p.ErrorTimes--
 			continue
 		}
 		var data core.DataGram
 		err = json.Unmarshal(buff[:length], &data)
 		if err != nil {
 			p.Logger.Error(err.Error())
+			p.ErrorTimes--
 			continue
 		}
 		p.Logger.Info("received : ", data)
+		p.ErrorTimes = p.MaxErrorTimes
 		switch data.Data.Type {
 		case core.IsActive:
 			{
