@@ -664,8 +664,20 @@ func (r *RegisterCenter) HandleRequest(conn net.Conn, datagram DataGram, id int6
 		}
 	case Get:
 		{
-			keys, ok := datagram.Data.Body.([]int64)
-			if !ok {
+			bytes, err := json.Marshal(datagram.Data.Body)
+			if err != nil {
+				r.PushData(conn, DataGram{
+					Data: Data{
+						TimeStamp: time.Now(),
+						Type:      GetDataFormException,
+						Body:      nil,
+					},
+					Tag: datagram.Tag, ServiceId: datagram.ServiceId})
+				return
+			}
+			keys := make([]int64, 0)
+			err = json.Unmarshal(bytes, &keys)
+			if err != nil {
 				r.PushData(conn, DataGram{
 					Data: Data{
 						TimeStamp: time.Now(),
@@ -676,7 +688,7 @@ func (r *RegisterCenter) HandleRequest(conn net.Conn, datagram DataGram, id int6
 				return
 			}
 			for _, key := range keys {
-				_, ok = r.DataMap[key]
+				_, ok := r.DataMap[key]
 				if !ok {
 					r.PushData(conn, DataGram{
 						Data: Data{
