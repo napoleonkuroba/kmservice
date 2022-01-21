@@ -326,5 +326,5 @@ func (p *Peer) Run() {
 	if err != nil {
 		p.Logger.Fatal(err.Error())
 	}
-	p.Listen()
+	go p.Listen()
 }
