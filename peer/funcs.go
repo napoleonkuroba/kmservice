@@ -124,15 +124,9 @@ func (p *Peer) Listen() {
 		case core.Update:
 			{
 				go func() {
-					response, err := json.Marshal(data.Data.Body)
-					if err != nil {
-						p.Logger.Warning(err.Error())
-					}
-					var content core.Data
-					err = json.Unmarshal(response, &content)
-					p.PeerData[content.Key] = content.Body
-					p.GetList[content.Key] = false
-					p.Logger.Info("Update", content.Key, response)
+					p.PeerData[data.Data.Key] = data.Data.Body
+					p.GetList[data.Data.Key] = false
+					p.Logger.Info("Update ", data.Data.Key, data.Data.Body)
 				}()
 				break
 			}
