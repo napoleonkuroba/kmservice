@@ -157,18 +157,7 @@ func (p *Peer) Listen() {
 			{
 				go func() {
 					time.Sleep(5 * time.Second)
-					bytes, err := json.Marshal(data.Data.Body)
-					if err != nil {
-						p.Logger.Error(err.Error())
-						return
-					}
-					var id int64
-					err = json.Unmarshal(bytes, &id)
-					if err != nil {
-						p.Logger.Error(err.Error())
-						return
-					}
-					p.GetSubscribeData([]int64{id})
+					p.GetSubscribeData([]int64{data.Data.Key})
 				}()
 				break
 			}

@@ -705,7 +705,7 @@ func (r *RegisterCenter) HandleRequest(conn net.Conn, datagram DataGram, id int6
 				find := false
 				for _, subscriber := range subscribers {
 					if id == subscriber {
-						if r.RLocker[key] != false {
+						if r.RLocker[key] == false {
 							r.PushData(conn, DataGram{
 								Data: Data{
 									TimeStamp: time.Now(),
