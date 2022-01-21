@@ -115,9 +115,15 @@ func (p *Peer) Listen() {
 		case core.Update:
 			{
 				go func() {
-					response := data.Data.Body.(core.Data)
-					p.PeerData[response.Key] = response.Body
-					p.GetList[response.Key] = false
+					response, err := json.Marshal(data.Data.Body)
+					if err != nil {
+						p.Logger.Warning(err.Error())
+					}
+					var content core.Data
+					err = json.Unmarshal(response, &content)
+					p.PeerData[content.Key] = content.Body
+					p.GetList[content.Key] = false
+					p.Logger.Info("Update", content.Key, response)
 				}()
 				break
 			}
@@ -201,11 +207,13 @@ func (p *Peer) PushData(data core.DataGram) error {
 	if err != nil {
 		return err
 	}
-	p.SQLClient.Insert(&DataGramStorage{
+	storage := DataGramStorage{
 		ServiceId: p.ServiceId,
 		Tag:       data.Tag,
 		DataGram:  data.Data,
-	})
+	}
+	p.SQLClient.Insert(&storage)
+	p.Logger.Info("push data : ", storage)
 	return nil
 }
 
@@ -270,9 +278,19 @@ func (p *Peer) UpdateRequest(key int64, new interface{}) bool {
 		},
 	})
 	p.UpdateRequestList[key] = 1
+	changed := 0
+	go func() {
+		time.Sleep(20 * time.Second)
+		if changed == 0 {
+			p.UpdateRequestList[key] = -1
+		} else {
+			return
+		}
+	}()
 	for p.UpdateRequestList[key] == 1 {
-
+		time.Sleep(1 * time.Second)
 	}
+	changed = 1
 	if p.UpdateRequestList[key] == -1 {
 		p.UpdateRequestList[key] = 0
 		return false

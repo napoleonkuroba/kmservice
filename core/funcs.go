@@ -604,6 +604,7 @@ func (r *RegisterCenter) ConnectionListen(conn net.Conn, id int64) {
 //  @param datagram
 //
 func (r *RegisterCenter) HandleRequest(conn net.Conn, datagram DataGram, id int64) {
+	r.Logger.Info("recived ", datagram)
 	switch datagram.Data.Type {
 	//处理更新请求
 	case Update:
