@@ -804,8 +804,9 @@ func (r *RegisterCenter) HandleRequest(conn net.Conn, datagram DataGram, id int6
 func (r *RegisterCenter) SubscribeUpdate() {
 	for update := range r.UpdateChannel {
 		//订阅加锁
+		_, ok := r.DataMap[update.Key]
 		r.RLocker[update.Key] = true
-		if r.DataMap[update.Key] != update.Request.Origin {
+		if r.DataMap[update.Key] != update.Request.Origin && ok == true {
 			r.PushData(update.From, DataGram{
 				Data: Data{
 					TimeStamp: time.Now(),
