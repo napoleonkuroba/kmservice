@@ -609,8 +609,21 @@ func (r *RegisterCenter) HandleRequest(conn net.Conn, datagram DataGram, id int6
 	//处理更新请求
 	case Update:
 		{
-			data, ok := datagram.Data.Body.(UpdateRequset)
-			if !ok {
+			bytes, err := json.Marshal(datagram.Data.Body)
+			if err != nil {
+				r.PushData(conn, DataGram{
+					Data: Data{
+						TimeStamp: time.Now(),
+						Type:      UpdateDataFormException,
+						Body:      nil,
+					},
+					Tag:       datagram.Tag,
+					ServiceId: datagram.ServiceId})
+				return
+			}
+			var data UpdateRequset
+			err = json.Unmarshal(bytes, &data)
+			if err != nil {
 				r.PushData(conn, DataGram{
 					Data: Data{
 						TimeStamp: time.Now(),
