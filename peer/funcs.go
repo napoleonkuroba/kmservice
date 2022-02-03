@@ -74,7 +74,7 @@ func (p *Peer) Connect() error {
 	if err != nil {
 		return err
 	}
-	if data.Data.Type == core.Success {
+	if data.Data.Title == core.SUCCESS {
 		p.Connection = conn
 		return nil
 	}
@@ -108,20 +108,20 @@ func (p *Peer) Listen() {
 		}
 		p.Logger.Info("received : ", data)
 		p.ErrorTimes = p.MaxErrorTimes
-		switch data.Data.Type {
-		case core.IsActive:
+		switch data.Data.Title {
+		case core.IS_ACTIVE:
 			{
 				p.PushData(core.DataGram{
 					Tag:       p.CreateTag(),
 					ServiceId: p.ServiceId,
 					Data: core.Data{
 						TimeStamp: time.Now(),
-						Type:      core.IsActive,
+						Title:     core.IS_ACTIVE,
 					},
 				})
 				break
 			}
-		case core.Update:
+		case core.UPDATE:
 			{
 				go func() {
 					p.PeerData[data.Data.Key] = data.Data.Body
@@ -130,24 +130,24 @@ func (p *Peer) Listen() {
 				}()
 				break
 			}
-		case core.UpdateSuccess:
+		case core.UPDATE_SUCCESS:
 			{
 				p.UpdateRequestList[data.Data.Key] = 2
 				break
 			}
-		case core.OriginalDataExpired:
+		case core.ORIGINAL_DATA_EXPIRED:
 			{
 				p.UpdateRequestList[data.Data.Key] = -1
 				break
 			}
 
-		case core.GetDataFormException:
+		case core.GET_DATA_FORM_EXECPTION:
 			{
 				p.GetList = make(map[int64]bool)
 				p.DataGramLog(data)
 				break
 			}
-		case core.DataLocked:
+		case core.DATA_LOCKED:
 			{
 				go func() {
 					time.Sleep(5 * time.Second)
@@ -155,7 +155,7 @@ func (p *Peer) Listen() {
 				}()
 				break
 			}
-		case core.NoSubcribeInfo:
+		case core.NO_SUBSCRIBE_INFO:
 			{
 				bytes, err := json.Marshal(data.Data.Body)
 				if err != nil {
@@ -172,7 +172,7 @@ func (p *Peer) Listen() {
 				p.DataGramLog(data)
 				break
 			}
-		case core.RequestTypeException:
+		case core.REQUEST_TYPE_EXCEPTION:
 			p.DataGramLog(data)
 			break
 		}
@@ -234,9 +234,9 @@ func (p *Peer) DataGramLog(data core.DataGram) {
 	_, err := p.SQLClient.Get(&storage)
 	if err != nil {
 		p.Logger.Error(err.Error())
-		p.Logger.Error(data.Tag, " ", data.Data.Type)
+		p.Logger.Error(data.Tag, " ", data.Data.Title)
 	} else {
-		p.Logger.Error(data.Tag, " ", data.Data.Type, " ", storage.DataGram)
+		p.Logger.Error(data.Tag, " ", data.Data.Title, " ", storage.DataGram)
 	}
 }
 
@@ -260,7 +260,7 @@ func (p *Peer) UpdateRequest(key int64, new interface{}) bool {
 		ServiceId: p.ServiceId,
 		Data: core.Data{
 			TimeStamp: time.Now(),
-			Type:      core.Update,
+			Title:     core.UPDATE,
 			Key:       key,
 			Body:      update,
 		},
@@ -294,12 +294,12 @@ func (p *Peer) UpdateRequest(key int64, new interface{}) bool {
 //  @param postType
 //  @param data
 //
-func (p *Peer) POST(postType string, data interface{}) {
+func (p *Peer) POST(postTitle core.PostTitle, data interface{}) {
 	p.PushData(core.DataGram{
 		Tag:       p.CreateTag(),
 		ServiceId: p.ServiceId,
 		Data: core.Data{
-			Type:      postType,
+			Title:     postTitle,
 			TimeStamp: time.Now(),
 			Body:      data,
 		},
@@ -316,7 +316,7 @@ func (p *Peer) GET(keys []int64) error {
 	apply := core.DataGram{
 		Data: core.Data{
 			TimeStamp: time.Now(),
-			Type:      core.Get,
+			Title:     core.GET,
 			Body:      keys,
 		},
 		ServiceId: p.ServiceId,
@@ -342,5 +342,5 @@ func (p *Peer) Run() {
 	if err != nil {
 		p.Logger.Fatal(err.Error())
 	}
-	go p.Listen()
+	p.Listen()
 }

@@ -281,7 +281,7 @@ func (r *RegisterCenter) Subscribe(subscriber int64, id int64) error {
 			ServiceId: 0,
 			Data: Data{
 				TimeStamp: time.Now(),
-				Type:      Update,
+				Title:     UPDATE,
 				Key:       id,
 				Body:      r.DataMap[id],
 			},
@@ -426,7 +426,7 @@ func NewCenter(sql *xorm.Engine, persistencePath string, logger *logrus.Logger, 
 		Subscribes:          make(map[int64]Subscribe),
 		SQLClient:           sql,
 		ServiceCache:        make(map[int64]MicroService),
-		ServiceActive:       make(map[int64]int),
+		ServiceActive:       make(map[int64]ServiceState),
 		WebSocketServer:     socketio.NewServer(nil),
 		Logger:              logger,
 		SocketPool:          make(map[int64]net.Conn),
@@ -511,7 +511,7 @@ func (r *RegisterCenter) SocketHandle(conn net.Conn) {
 		r.PushData(conn, DataGram{
 			Data: Data{
 				TimeStamp: time.Now(),
-				Type:      Failure,
+				Title:     FAILURE,
 				Body:      err,
 			},
 		})
@@ -525,7 +525,7 @@ func (r *RegisterCenter) SocketHandle(conn net.Conn) {
 		r.PushData(conn, DataGram{
 			Data: Data{
 				TimeStamp: time.Now(),
-				Type:      Failure,
+				Title:     FAILURE,
 				Body:      err,
 			},
 		})
@@ -537,7 +537,7 @@ func (r *RegisterCenter) SocketHandle(conn net.Conn) {
 		r.PushData(conn, DataGram{
 			Data: Data{
 				TimeStamp: time.Now(),
-				Type:      Success,
+				Title:     SUCCESS,
 			},
 		})
 		r.SocketPool[service.Id] = conn
@@ -549,7 +549,7 @@ func (r *RegisterCenter) SocketHandle(conn net.Conn) {
 	r.PushData(conn, DataGram{
 		Data: Data{
 			TimeStamp: time.Now(),
-			Type:      Failure,
+			Title:     FAILURE,
 			Body:      err,
 		},
 	})
@@ -571,7 +571,7 @@ func (r *RegisterCenter) ConnectionListen(conn net.Conn, id int64) {
 					Tag:       "0",
 					ServiceId: 0,
 					Data: Data{
-						Type:      Update,
+						Title:     UPDATE,
 						Key:       key,
 						TimeStamp: time.Now(),
 						Body:      r.DataMap[key],
@@ -606,16 +606,16 @@ func (r *RegisterCenter) ConnectionListen(conn net.Conn, id int64) {
 //
 func (r *RegisterCenter) HandleRequest(conn net.Conn, datagram DataGram, id int64) {
 	r.Logger.Info("recived ", datagram)
-	switch datagram.Data.Type {
+	switch datagram.Data.Title {
 	//处理更新请求
-	case Update:
+	case UPDATE:
 		{
 			bytes, err := json.Marshal(datagram.Data.Body)
 			if err != nil {
 				r.PushData(conn, DataGram{
 					Data: Data{
 						TimeStamp: time.Now(),
-						Type:      UpdateDataFormException,
+						Title:     UPDATE_DATA_FORM_EXCEPTION,
 						Body:      nil,
 					},
 					Tag:       datagram.Tag,
@@ -628,7 +628,7 @@ func (r *RegisterCenter) HandleRequest(conn net.Conn, datagram DataGram, id int6
 				r.PushData(conn, DataGram{
 					Data: Data{
 						TimeStamp: time.Now(),
-						Type:      UpdateDataFormException,
+						Title:     UPDATE_DATA_FORM_EXCEPTION,
 						Body:      nil,
 					},
 					Tag:       datagram.Tag,
@@ -656,21 +656,21 @@ func (r *RegisterCenter) HandleRequest(conn net.Conn, datagram DataGram, id int6
 				r.PushData(conn, DataGram{
 					Data: Data{
 						TimeStamp: time.Now(),
-						Type:      WithoutPermission,
+						Title:     WITHOUT_PERMISSION,
 						Body:      nil,
 					},
 					Tag: datagram.Tag, ServiceId: datagram.ServiceId})
 			}
 			return
 		}
-	case Get:
+	case GET:
 		{
 			bytes, err := json.Marshal(datagram.Data.Body)
 			if err != nil {
 				r.PushData(conn, DataGram{
 					Data: Data{
 						TimeStamp: time.Now(),
-						Type:      GetDataFormException,
+						Title:     GET_DATA_FORM_EXECPTION,
 						Body:      nil,
 					},
 					Tag: datagram.Tag, ServiceId: datagram.ServiceId})
@@ -682,7 +682,7 @@ func (r *RegisterCenter) HandleRequest(conn net.Conn, datagram DataGram, id int6
 				r.PushData(conn, DataGram{
 					Data: Data{
 						TimeStamp: time.Now(),
-						Type:      GetDataFormException,
+						Title:     GET_DATA_FORM_EXECPTION,
 						Body:      nil,
 					},
 					Tag: datagram.Tag, ServiceId: datagram.ServiceId})
@@ -694,7 +694,7 @@ func (r *RegisterCenter) HandleRequest(conn net.Conn, datagram DataGram, id int6
 					r.PushData(conn, DataGram{
 						Data: Data{
 							TimeStamp: time.Now(),
-							Type:      KeyNotExist,
+							Title:     KEY_NOT_EXIST,
 							Key:       key,
 						},
 						Tag:       datagram.Tag,
@@ -709,7 +709,7 @@ func (r *RegisterCenter) HandleRequest(conn net.Conn, datagram DataGram, id int6
 							r.PushData(conn, DataGram{
 								Data: Data{
 									TimeStamp: time.Now(),
-									Type:      Update,
+									Title:     UPDATE,
 									Key:       key,
 									Body:      r.DataMap[key],
 								},
@@ -719,7 +719,7 @@ func (r *RegisterCenter) HandleRequest(conn net.Conn, datagram DataGram, id int6
 							r.PushData(conn, DataGram{
 								Data: Data{
 									TimeStamp: time.Now(),
-									Type:      DataLocked,
+									Title:     DATA_LOCKED,
 									Key:       key,
 									Body:      nil,
 								},
@@ -734,7 +734,7 @@ func (r *RegisterCenter) HandleRequest(conn net.Conn, datagram DataGram, id int6
 					r.PushData(conn, DataGram{
 						Data: Data{
 							TimeStamp: time.Now(),
-							Type:      NoSubcribeInfo,
+							Title:     NO_SUBSCRIBE_INFO,
 							Key:       key,
 							Body:      nil,
 						},
@@ -745,19 +745,19 @@ func (r *RegisterCenter) HandleRequest(conn net.Conn, datagram DataGram, id int6
 			}
 			return
 		}
-	case IsActive:
+	case IS_ACTIVE:
 		{
 			r.ServiceActive[datagram.ServiceId] = Active
 			return
 		}
-	case APIlist:
+	case API_LIST:
 		{
 			datas, ok := datagram.Data.Body.([]interface{})
 			if !ok {
 				r.PushData(conn, DataGram{
 					Data: Data{
 						TimeStamp: time.Now(),
-						Type:      APIsDataFormException,
+						Title:     API_DATA_FORM_EXECPTION,
 						Body:      nil,
 					},
 					Tag:       datagram.Tag,
@@ -790,7 +790,7 @@ func (r *RegisterCenter) HandleRequest(conn net.Conn, datagram DataGram, id int6
 	r.PushData(conn, DataGram{
 		Data: Data{
 			TimeStamp: time.Now(),
-			Type:      RequestTypeException,
+			Title:     REQUEST_TYPE_EXCEPTION,
 		},
 		Tag:       datagram.Tag,
 		ServiceId: datagram.ServiceId})
@@ -811,7 +811,7 @@ func (r *RegisterCenter) SubscribeUpdate() {
 			r.PushData(update.From, DataGram{
 				Data: Data{
 					TimeStamp: time.Now(),
-					Type:      OriginalDataExpired,
+					Title:     ORIGINAL_DATA_EXPIRED,
 					Key:       update.Key,
 					Body:      nil,
 				},
@@ -825,7 +825,7 @@ func (r *RegisterCenter) SubscribeUpdate() {
 		r.PushData(update.From, DataGram{
 			Data: Data{
 				TimeStamp: time.Now(),
-				Type:      UpdateSuccess,
+				Title:     UPDATE_SUCCESS,
 				Key:       update.Key,
 				Body:      nil,
 			},
@@ -836,7 +836,7 @@ func (r *RegisterCenter) SubscribeUpdate() {
 			r.PushData(r.SocketPool[subscribe], DataGram{
 				Data: Data{
 					TimeStamp: time.Now(),
-					Type:      Update,
+					Title:     UPDATE,
 					Key:       update.Key,
 					Body:      update.Request.New,
 				},
@@ -902,7 +902,7 @@ func (r *RegisterCenter) IsActive(id int64) {
 		ServiceId: id,
 		Data: Data{
 			TimeStamp: time.Now(),
-			Type:      IsActive,
+			Title:     IS_ACTIVE,
 		},
 	})
 }

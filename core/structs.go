@@ -8,29 +8,35 @@ import (
 	"time"
 )
 
+type PostTitle int
+
 const (
-	Update  = "update"
-	Error   = "error"
-	Success = "success"
-	Failure = "failure"
-	Get     = "get"
-	APIlist = "APIlist"
+	_ PostTitle = iota
+	GET
+	UPDATE
+	SUCCESS
+	FAILURE
+	API_LIST
+	IS_ACTIVE
+	DATA_LOCKED
+	KEY_NOT_EXIST
+	UPDATE_SUCCESS
+	NO_SUBSCRIBE_INFO
+	WITHOUT_PERMISSION
+	ORIGINAL_DATA_EXPIRED
+	REQUEST_TYPE_EXCEPTION
+	GET_DATA_FORM_EXECPTION
+	API_DATA_FORM_EXECPTION
+	UPDATE_DATA_FORM_EXCEPTION
+)
 
-	Active  = 1
-	Pending = -1
-	Stop    = 0
+type ServiceState int
 
-	IsActive                = "IsActive"
-	UpdateSuccess           = "UpdateSuccess"
-	OriginalDataExpired     = "OriginalDataExpired"
-	UpdateDataFormException = "UpdateDataFormException"
-	APIsDataFormException   = "APIsDataFormException"
-	GetDataFormException    = "GetDataFormException"
-	RequestTypeException    = "RequestTypeException"
-	KeyNotExist             = "KeyNotExist"
-	NoSubcribeInfo          = "NoSubcribeInfo"
-	DataLocked              = "DataLocked"
-	WithoutPermission       = "WithoutPermission"
+const (
+	_ ServiceState = iota
+	Stop
+	Pending
+	Active
 )
 
 type RegisterCenter struct {
@@ -39,7 +45,7 @@ type RegisterCenter struct {
 	Subscribes          map[int64]Subscribe    //订阅名单
 	SQLClient           *xorm.Engine           //数据库引擎
 	ServiceCache        map[int64]MicroService //缓存所有服务基本信息
-	ServiceActive       map[int64]int          //记录服务是否活跃
+	ServiceActive       map[int64]ServiceState //记录服务是否活跃
 
 	WebSocketServer *socketio.Server //websocket服务
 	Logger          *logrus.Logger   //日志管理
@@ -106,7 +112,7 @@ type UpdatePackage struct {
 }
 
 type Data struct {
-	Type      string
+	Title     PostTitle
 	Key       int64
 	TimeStamp time.Time
 	Body      interface{}
