@@ -26,6 +26,14 @@ type Peer struct {
 	ErrorTimes    int
 }
 
+type PeerConfig struct {
+	CenterIP    string `json:"center_ip"`
+	CenterPort  string `json:"center_port"`
+	Token       string `json:"token"`
+	ServiceId   int64  `json:"service_id"`
+	ServiceName string `json:"service_name"`
+}
+
 type DataGramStorage struct {
 	Id        int64
 	ServiceId int64

@@ -13,20 +13,20 @@ import (
 //
 //  NewPeer
 //  @Description: 创建新的peer节点
-//  @param center_ip
-//  @param center_port
-//  @param token
+//  @param config 节点配置
+//  @param sql
 //  @param logger
+//  @param maxerrorTimes
 //  @return *Peer
 //
-func NewPeer(center_ip string, center_port string, token string, id int64, name string, sql *xorm.Engine, logger *logrus.Logger, maxerrorTimes int) *Peer {
+func NewPeer(config PeerConfig, sql *xorm.Engine, logger *logrus.Logger, maxerrorTimes int) *Peer {
 	sql.Sync2(new(DataGramStorage))
 	return &Peer{
-		CenterIP:          center_ip,
-		CenterPort:        center_port,
-		Token:             token,
-		ServiceId:         id,
-		ServiceName:       name,
+		CenterIP:          config.CenterIP,
+		CenterPort:        config.CenterPort,
+		Token:             config.Token,
+		ServiceId:         config.ServiceId,
+		ServiceName:       config.ServiceName,
 		PeerData:          make(map[int64]interface{}),
 		GetList:           make(map[int64]bool),
 		UpdateRequestList: make(map[int64]int),
@@ -151,7 +151,7 @@ func (p *Peer) Listen() {
 			{
 				go func() {
 					time.Sleep(5 * time.Second)
-					p.GetSubscribeData([]int64{data.Data.Key})
+					p.GET([]int64{data.Data.Key})
 				}()
 				break
 			}
@@ -177,32 +177,6 @@ func (p *Peer) Listen() {
 			break
 		}
 	}
-}
-
-//
-//  GetSubscribeData
-//  @Description: 手动获取订阅数据内容
-//  @receiver p
-//  @param key
-//
-func (p *Peer) GetSubscribeData(keys []int64) error {
-	apply := core.DataGram{
-		Data: core.Data{
-			TimeStamp: time.Now(),
-			Type:      core.Get,
-			Body:      keys,
-		},
-		ServiceId: p.ServiceId,
-		Tag:       p.CreateTag(),
-	}
-	err := p.PushData(apply)
-	if err != nil {
-		return err
-	}
-	for _, key := range keys {
-		p.GetList[key] = true
-	}
-	return nil
 }
 
 //
@@ -314,20 +288,48 @@ func (p *Peer) UpdateRequest(key int64, new interface{}) bool {
 }
 
 //
-//  SendWebAPIs
-//  @Description: 向中心节点发送服务接口列表
+//  POST
+//  @Description: 向中心节点发送数据
 //  @receiver p
+//  @param postType
+//  @param data
 //
-func (p *Peer) SendWebAPIs(apis []core.API) {
+func (p *Peer) POST(postType string, data interface{}) {
 	p.PushData(core.DataGram{
 		Tag:       p.CreateTag(),
 		ServiceId: p.ServiceId,
 		Data: core.Data{
-			Type:      core.APIlist,
+			Type:      postType,
 			TimeStamp: time.Now(),
-			Body:      apis,
+			Body:      data,
 		},
 	})
+}
+
+//
+//  GetSubscribeData
+//  @Description: 手动获取订阅数据内容
+//  @receiver p
+//  @param key
+//
+func (p *Peer) GET(keys []int64) error {
+	apply := core.DataGram{
+		Data: core.Data{
+			TimeStamp: time.Now(),
+			Type:      core.Get,
+			Body:      keys,
+		},
+		ServiceId: p.ServiceId,
+		Tag:       p.CreateTag(),
+	}
+	err := p.PushData(apply)
+	if err != nil {
+		return err
+	}
+	for _, key := range keys {
+		p.GetList[key] = true
+	}
+	return nil
 }
 
 //
