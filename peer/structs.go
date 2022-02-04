@@ -8,22 +8,24 @@ import (
 )
 
 type Peer struct {
-	CenterIP    string
-	CenterPort  string
-	Token       string
+	centerIP    string
+	centerPort  string
+	token       string
 	ServiceId   int64
 	ServiceName string
 
 	PeerData          map[int64]interface{}
-	GetList           map[int64]bool
-	UpdateRequestList map[int64]int //订阅更新申请状态，1为申请中，2为申请成功，-1为申请失败,0为可申请
+	getList           map[int64]bool
+	updateRequestList map[int64]int //订阅更新申请状态，1为申请中，2为申请成功，-1为申请失败,0为可申请
+	subscribeKeys     map[string]int64
+	pendingList       map[string]core.PendingGram //等待队列
 
-	Logger    *logrus.Logger
-	SQLClient *xorm.Engine
+	logger    *logrus.Logger
+	sqlClient *xorm.Engine
 
-	MaxErrorTimes int
-	Connection    net.Conn
-	ErrorTimes    int
+	maxErrorTimes int
+	connection    net.Conn
+	errorTimes    int
 }
 
 type PeerConfig struct {

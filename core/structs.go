@@ -8,26 +8,35 @@ import (
 	"time"
 )
 
+const DefaultTag = "Center"
+const DefaultInt = int64(0)
+
 type PostTitle int
 
 const (
 	_ PostTitle = iota
 	GET
 	UPDATE
+	CONFIRM
 	SUCCESS
+	CONNECT
 	FAILURE
 	API_LIST
+	EXCEPTION
 	IS_ACTIVE
-	DATA_LOCKED
-	KEY_NOT_EXIST
-	UPDATE_SUCCESS
-	NO_SUBSCRIBE_INFO
-	WITHOUT_PERMISSION
-	ORIGINAL_DATA_EXPIRED
-	REQUEST_TYPE_EXCEPTION
-	GET_DATA_FORM_EXECPTION
-	API_DATA_FORM_EXECPTION
-	UPDATE_DATA_FORM_EXCEPTION
+	SUBSCRIBES
+)
+
+const (
+	NO_SUBSCRIBE_INFO          = "NO_SUBSCRIBE_INFO"
+	KEY_NOT_EXIST              = "KEY_NOT_EXIST"
+	DATA_LOCKED                = "DATA_LOCKED"
+	WITHOUT_PERMISSION         = "WITHOUT_PERMISSION"
+	ORIGINAL_DATA_EXPIRED      = "ORIGINAL_DATA_EXPIRED"
+	REQUEST_TYPE_EXCEPTION     = "REQUEST_TYPE_EXCEPTION"
+	GET_DATA_FORM_EXECPTION    = "GET_DATA_FORM_EXECPTION"
+	API_DATA_FORM_EXECPTION    = "API_DATA_FORM_EXECPTION"
+	UPDATE_DATA_FORM_EXCEPTION = "UPDATE_DATA_FORM_EXCEPTION"
 )
 
 type ServiceState int
@@ -39,24 +48,30 @@ const (
 	Active
 )
 
+type PendingGram struct {
+	Time        time.Time
+	ResendTimes int
+	Message     DataGram
+}
+
 type RegisterCenter struct {
-	PersistenceFilePath string                 //持久化文件路径
+	persistenceFilePath string                 //持久化文件路径
 	DataMap             map[int64]interface{}  //共享文件库
 	Subscribes          map[int64]Subscribe    //订阅名单
-	SQLClient           *xorm.Engine           //数据库引擎
+	sqlClient           *xorm.Engine           //数据库引擎
 	ServiceCache        map[int64]MicroService //缓存所有服务基本信息
 	ServiceActive       map[int64]ServiceState //记录服务是否活跃
 
-	WebSocketServer *socketio.Server //websocket服务
-	Logger          *logrus.Logger   //日志管理
+	webSocketServer *socketio.Server //websocket服务
+	logger          *logrus.Logger   //日志管理
 
-	SocketPool  map[int64]net.Conn //TCP连接池
-	ConnNum     int                //当前维护连接数
-	MaxPoolSize int                //最大连接数量
+	socketPool  map[int64]net.Conn //TCP连接池
+	connNum     int                //当前维护连接数
+	maxPoolSize int                //最大连接数量
 
-	PersistenceChannel chan FileStorage   //数据更新通道
-	UpdateChannel      chan UpdatePackage //数据更新通道
-	RLocker            map[int64]bool     //读数据锁
+	persistenceChannel chan FileStorage   //数据更新通道
+	updateChannel      chan UpdatePackage //数据更新通道
+	rLocker            map[int64]bool     //读数据锁
 }
 
 type MicroService struct {
