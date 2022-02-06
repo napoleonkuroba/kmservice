@@ -21,6 +21,35 @@ func (p *Peer) connect() error {
 		return err
 	}
 
+	go func() {
+		//接收服务器响应
+		connected := 0
+		for connected != -1 {
+			go func() {
+				time.Sleep(2 * time.Second)
+				if connected != 1 {
+					connected = -1
+					p.logger.Fatal("connection time out")
+				}
+			}()
+			buff := make([]byte, 20480)
+			length, err := conn.Read(buff)
+			if err != nil {
+				break
+			}
+			var data core.DataGram
+			err = json.Unmarshal(buff[:length], &data)
+			if err != nil {
+				break
+			}
+			if data.Data.Title == core.CONNECT {
+				p.connection = conn
+				connected = 1
+				go p.listen()
+				break
+			}
+		}
+	}()
 	//发送服务连接请求
 	connectApply := core.ConnApply{
 		Id:    p.ServiceId,
@@ -33,33 +62,6 @@ func (p *Peer) connect() error {
 	_, err = conn.Write(bytes)
 	if err != nil {
 		return err
-	}
-
-	//接收服务器响应
-	connected := 0
-	for connected != -1 {
-		go func() {
-			time.Sleep(2 * time.Second)
-			if connected != 1 {
-				connected = -1
-				p.logger.Fatal("connection time out")
-			}
-		}()
-		buff := make([]byte, 20480)
-		length, err := conn.Read(buff)
-		if err != nil {
-			break
-		}
-		var data core.DataGram
-		err = json.Unmarshal(buff[:length], &data)
-		if err != nil {
-			break
-		}
-		if data.Data.Title == core.CONNECT {
-			p.connection = conn
-			connected = 1
-			break
-		}
 	}
 	return nil
 }
