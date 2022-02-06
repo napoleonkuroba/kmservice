@@ -424,7 +424,7 @@ func (r *RegisterCenter) post(conn net.Conn, title PostTitle, data interface{}, 
 		},
 	}
 	r.logger.Info("send : ", datagram)
-	bytes, err := json.Marshal(&data)
+	bytes, err := json.Marshal(&datagram)
 	if err != nil {
 		r.logger.Error(err.Error())
 	}
