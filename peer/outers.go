@@ -4,6 +4,8 @@ import (
 	"github.com/go-xorm/xorm"
 	"github.com/hducqa/kmservice/core"
 	"github.com/sirupsen/logrus"
+	"os"
+	"strings"
 	"time"
 )
 
@@ -16,8 +18,25 @@ import (
 //  @param maxerrorTimes 最大错误次数
 //  @return *Peer
 //
-func NewPeer(config PeerConfig, sql *xorm.Engine, logger *logrus.Logger, maxerrorTimes int) *Peer {
+func NewPeer(config PeerConfig, sql *xorm.Engine, logger *logrus.Logger, maxerrorTimes int, persistencePath string) *Peer {
 	sql.Sync2(new(DataGramStorage))
+	persistencePath = strings.ReplaceAll(persistencePath, " ", "")
+	if persistencePath == "" {
+		persistencePath = "./"
+	}
+	if persistencePath[len(persistencePath)-1:] != "/" {
+		persistencePath += "/"
+	}
+	_, err := os.Stat(persistencePath)
+	if err != nil {
+		err = os.Mkdir(persistencePath, os.ModePerm)
+		if err != nil {
+			logger.Fatal(err.Error())
+		}
+	}
+	if err != nil {
+		logger.Fatal(err.Error())
+	}
 	return &Peer{
 		centerIP:          config.CenterIP,
 		centerPort:        config.CenterPort,
@@ -34,6 +53,7 @@ func NewPeer(config PeerConfig, sql *xorm.Engine, logger *logrus.Logger, maxerro
 		maxErrorTimes:     maxerrorTimes,
 		connection:        nil,
 		errorTimes:        10,
+		filePath:          persistencePath,
 	}
 }
 

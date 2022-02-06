@@ -76,23 +76,25 @@ func persistence(data FileStorage, actualPath string) error {
 //  @receiver r
 //  @return error
 //
-func (r *RegisterCenter) recovery() error {
+func (r *RegisterCenter) recovery() {
 	file, err := os.Open(r.persistenceFilePath)
 	defer file.Close()
 	if err != nil {
-		return err
+		r.logger.Error(err.Error())
+		return
 	}
 	bytes, err := ioutil.ReadAll(file)
 	if err != nil {
-		return err
+		r.logger.Error(err.Error())
+		return
 	}
 	var data FileStorage
 	err = json.Unmarshal(bytes, &data)
 	if err != nil {
-		return err
+		r.logger.Error(err.Error())
+		return
 	}
 	r.DataMap = data.DataMap
-	return nil
 }
 
 //

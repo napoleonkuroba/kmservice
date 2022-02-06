@@ -26,6 +26,7 @@ type Peer struct {
 	maxErrorTimes int
 	connection    net.Conn
 	errorTimes    int
+	filePath      string
 }
 
 type PeerConfig struct {
@@ -34,11 +35,11 @@ type PeerConfig struct {
 	Token       string `json:"token"`
 	ServiceId   int64  `json:"service_id"`
 	ServiceName string `json:"service_name"`
+	FilePath    string `json:"peer_file_path"`
 }
 
 type DataGramStorage struct {
 	Id        int64
 	ServiceId int64
 	Tag       string
-	DataGram  core.Data
 }

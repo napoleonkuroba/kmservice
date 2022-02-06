@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/hducqa/kmservice/core"
+	"io/ioutil"
 	"math/rand"
 	"net"
+	"os"
 	"strconv"
 	"time"
 )
@@ -189,9 +191,15 @@ func (p *Peer) post(data core.DataGram) error {
 	storage := DataGramStorage{
 		ServiceId: p.ServiceId,
 		Tag:       data.Tag,
-		DataGram:  data.Data,
 	}
-	p.sqlClient.Insert(&storage)
+	go func() {
+		p.sqlClient.Insert(&storage)
+		fileBytes, _ := json.Marshal(data)
+		f, _ := os.OpenFile(p.filePath+data.Tag+strconv.Itoa(int(p.ServiceId)), os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
+		defer f.Close()
+		n, _ := f.Seek(0, os.SEEK_END)
+		_, err = f.WriteAt(fileBytes, n)
+	}()
 	p.pendingList[data.Tag] = core.PendingGram{
 		Time:        time.Now(),
 		ResendTimes: 0,
@@ -233,7 +241,21 @@ func (p *Peer) dataGramLog(data core.DataGram) {
 		p.logger.Error(err.Error())
 		p.logger.Error(data.Tag, " ", data.Data.Title)
 	} else {
-		p.logger.Error(data.Tag, " ", data.Data.Title, " ", storage.DataGram)
+		file, err := os.Open(p.filePath + data.Tag + strconv.Itoa(int(storage.ServiceId)))
+		defer file.Close()
+		if err != nil {
+			p.logger.Error(err.Error())
+		}
+		bytes, err := ioutil.ReadAll(file)
+		if err != nil {
+			p.logger.Error(err.Error())
+		}
+		var dataBody core.Data
+		err = json.Unmarshal(bytes, &dataBody)
+		if err != nil {
+			p.logger.Error(err.Error())
+		}
+		p.logger.Error(data.Tag, " ", data.Data.Title, " ", dataBody)
 	}
 }
 
