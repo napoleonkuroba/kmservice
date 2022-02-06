@@ -3,6 +3,7 @@ package peer
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/hducqa/kmservice/core"
 	"math/rand"
 	"net"
@@ -60,6 +61,7 @@ func (p *Peer) connect() error {
 //  @receiver p
 //
 func (p *Peer) listen() {
+	fmt.Println("Successfully connected to the center ")
 	for {
 		if p.errorTimes == 0 {
 			p.logger.Error("stopped for getting error too many times")
