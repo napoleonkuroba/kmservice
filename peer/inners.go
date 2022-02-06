@@ -2,7 +2,6 @@ package peer
 
 import (
 	"encoding/json"
-	"errors"
 	"github.com/hducqa/kmservice/core"
 	"math/rand"
 	"net"
@@ -37,21 +36,32 @@ func (p *Peer) connect() error {
 	}
 
 	//接收服务器响应
-	buff := make([]byte, 20480)
-	length, err := conn.Read(buff)
-	if err != nil {
-		return err
+	connected := 0
+	for connected != -1 {
+		go func() {
+			time.Sleep(2 * time.Second)
+			if connected != 1 {
+				connected = -1
+				p.logger.Fatal("connection time out")
+			}
+		}()
+		buff := make([]byte, 20480)
+		length, err := conn.Read(buff)
+		if err != nil {
+			break
+		}
+		var data core.DataGram
+		err = json.Unmarshal(buff[:length], &data)
+		if err != nil {
+			break
+		}
+		if data.Data.Title == core.CONNECT {
+			p.connection = conn
+			connected = 1
+			break
+		}
 	}
-	var data core.DataGram
-	err = json.Unmarshal(buff[:length], &data)
-	if err != nil {
-		return err
-	}
-	if data.Data.Title == core.CONNECT {
-		p.connection = conn
-		return nil
-	}
-	return errors.New(data.Data.Body.(string))
+	return nil
 }
 
 //
