@@ -20,10 +20,9 @@ func (p *Peer) connect() error {
 	if err != nil {
 		return err
 	}
-
+	connected := 0
 	go func() {
 		//接收服务器响应
-		connected := 0
 		for connected != -1 {
 			go func() {
 				time.Sleep(2 * time.Second)
@@ -63,6 +62,11 @@ func (p *Peer) connect() error {
 	if err != nil {
 		return err
 	}
+	for connected != 1 {
+
+	}
+	go p.resend()
+	p.listen()
 	return nil
 }
 

@@ -47,7 +47,6 @@ func (p *Peer) Run() {
 	if err != nil {
 		p.logger.Fatal(err.Error())
 	}
-	go p.resend()
 }
 
 //
