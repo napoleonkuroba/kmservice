@@ -48,12 +48,9 @@ func NewCenter(sql *xorm.Engine, persistencePath string, logger *logrus.Logger, 
 		if err != nil {
 			logger.Fatal(err.Error())
 		}
+		persistence(FileStorage{DataMap: make(map[int64]interface{})}, persistencePath)
 	}
 
-	err = sql.Sync2(new(MicroService), new(Subscribe))
-	if err != nil {
-		return nil, err
-	}
 	center := RegisterCenter{
 		persistenceFilePath: persistencePath,
 		DataMap:             make(map[int64]interface{}),
@@ -70,15 +67,8 @@ func NewCenter(sql *xorm.Engine, persistencePath string, logger *logrus.Logger, 
 		updateChannel:       make(chan UpdatePackage, 1000),
 		rLocker:             make(map[int64]bool),
 	}
-	_, err = os.Stat(center.persistenceFilePath)
-	if err == nil {
-		center.recovery()
-	}
-	err = center.loadServices()
-	if err != nil {
-		return nil, err
-	}
-	err = center.loadSubscribes()
+
+	err = sql.Sync2(new(MicroService), new(Subscribe))
 	if err != nil {
 		return nil, err
 	}
@@ -92,10 +82,13 @@ func NewCenter(sql *xorm.Engine, persistencePath string, logger *logrus.Logger, 
 //  @param port	监听端口
 //
 func (r *RegisterCenter) Run(port string) {
+	go r.loadSubscribes()
+	go r.loadServices()
 	go r.subscribeUpdate()
 	go r.persistenceChannelData()
 	go r.timingStatusCheck()
 	go r.recovery()
+
 	listen, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		r.logger.Fatal(err.Error())
