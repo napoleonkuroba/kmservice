@@ -37,7 +37,7 @@ func (p *Peer) connect() error {
 	}
 
 	//接收服务器响应
-	buff := make([]byte, 1024)
+	buff := make([]byte, 20480)
 	length, err := conn.Read(buff)
 	if err != nil {
 		return err

@@ -117,7 +117,7 @@ func (r *RegisterCenter) displaySubscribes() {
 //  @param conn	连接对象
 //
 func (r *RegisterCenter) socketHandle(conn net.Conn) {
-	buff := make([]byte, 2048)
+	buff := make([]byte, 20480)
 	length, err := conn.Read(buff)
 	if err != nil {
 		r.logger.Error(err.Error())
@@ -137,7 +137,7 @@ func (r *RegisterCenter) socketHandle(conn net.Conn) {
 	exist, err := r.sqlClient.Get(&service)
 	if err != nil {
 		r.logger.Error(err.Error())
-		r.post(conn, FAILURE, err, DefaultTag, DefaultInt, DefaultInt)
+		r.post(conn, FAILURE, err.Error(), DefaultTag, DefaultInt, DefaultInt)
 		time.Sleep(2 * time.Second)
 		conn.Close()
 		return
@@ -145,7 +145,7 @@ func (r *RegisterCenter) socketHandle(conn net.Conn) {
 	if !exist {
 		address := conn.RemoteAddr()
 		r.logger.Warning(errors.New("fake connection from " + address.String()))
-		r.post(conn, FAILURE, err, DefaultTag, DefaultInt, DefaultInt)
+		r.post(conn, FAILURE, err.Error(), DefaultTag, DefaultInt, DefaultInt)
 		time.Sleep(2 * time.Second)
 		conn.Close()
 		return
@@ -158,7 +158,7 @@ func (r *RegisterCenter) socketHandle(conn net.Conn) {
 		go r.connectionListen(conn, service.Id)
 		return
 	}
-	r.post(conn, FAILURE, err, DefaultTag, DefaultInt, DefaultInt)
+	r.post(conn, FAILURE, err.Error(), DefaultTag, DefaultInt, DefaultInt)
 	time.Sleep(2 * time.Second)
 	conn.Close()
 }
