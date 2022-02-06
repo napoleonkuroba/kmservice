@@ -44,11 +44,10 @@ func NewCenter(sql *xorm.Engine, persistencePath string, logger *logrus.Logger, 
 	persistencePath += "kmserver.db"
 	_, err = os.Stat(persistencePath)
 	if err != nil {
-		logger.Fatal(err.Error())
-	}
-	_, err = os.Create(persistencePath)
-	if err != nil {
-		logger.Fatal(err.Error())
+		_, err = os.Create(persistencePath)
+		if err != nil {
+			logger.Fatal(err.Error())
+		}
 	}
 
 	err = sql.Sync2(new(MicroService), new(Subscribe))
