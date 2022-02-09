@@ -69,7 +69,7 @@ func (p *Peer) listen() {
 			p.logger.Error("stopped for getting error too many times")
 			return
 		}
-		buff := make([]byte, 409600)
+		buff := make([]byte, 1048576)
 		length, err := p.connection.Read(buff)
 		if err != nil {
 			p.logger.Error(err.Error())

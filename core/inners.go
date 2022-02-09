@@ -183,7 +183,7 @@ func (r *RegisterCenter) connectionListen(conn net.Conn, id int64) {
 		}
 	}
 	for {
-		buff := make([]byte, 409600)
+		buff := make([]byte, 1048576)
 		length, err := conn.Read(buff)
 		if err != nil {
 			r.logger.Error(err.Error())
@@ -240,12 +240,14 @@ func (r *RegisterCenter) handle(conn net.Conn, datagram DataGram, id int64) {
 func (r RegisterCenter) handleFindLink(conn net.Conn, datagram DataGram) {
 	bytes, err := json.Marshal(datagram.Data.Body)
 	if err != nil {
+		r.logger.Error(err.Error())
 		r.post(conn, EXCEPTION, FINDLINK_DATA_FORM_EXECPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
 		return
 	}
 	var key string
 	err = json.Unmarshal(bytes, &key)
 	if err != nil {
+		r.logger.Error(err.Error())
 		r.post(conn, EXCEPTION, FINDLINK_DATA_FORM_EXECPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
 		return
 	}
@@ -285,12 +287,14 @@ func (r *RegisterCenter) handleLink(conn net.Conn, datagram DataGram) {
 func (r *RegisterCenter) handleUpdate(conn net.Conn, datagram DataGram, id int64) {
 	bytes, err := json.Marshal(datagram.Data.Body)
 	if err != nil {
+		r.logger.Error(err.Error())
 		r.post(conn, EXCEPTION, UPDATE_DATA_FORM_EXCEPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
 		return
 	}
 	var data UpdateRequset
 	err = json.Unmarshal(bytes, &data)
 	if err != nil {
+		r.logger.Error(err.Error())
 		r.post(conn, EXCEPTION, UPDATE_DATA_FORM_EXCEPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
 		return
 	}
@@ -320,12 +324,14 @@ func (r *RegisterCenter) handleUpdate(conn net.Conn, datagram DataGram, id int64
 func (r *RegisterCenter) handleGet(conn net.Conn, datagram DataGram, id int64) {
 	bytes, err := json.Marshal(datagram.Data.Body)
 	if err != nil {
+		r.logger.Error(err.Error())
 		r.post(conn, EXCEPTION, GET_DATA_FORM_EXECPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
 		return
 	}
 	keys := make([]int64, 0)
 	err = json.Unmarshal(bytes, &keys)
 	if err != nil {
+		r.logger.Error(err.Error())
 		r.post(conn, EXCEPTION, GET_DATA_FORM_EXECPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
 		return
 	}
