@@ -158,6 +158,11 @@ func (r *RegisterCenter) socketHandle(conn net.Conn) {
 		r.socketPool[service.Id] = conn
 		r.ServiceActive[service.Id] = Active
 		r.connNum++
+		subscribeMap := make(map[string]int64)
+		for _, subscribe := range r.Subscribes {
+			subscribeMap[subscribe.Key] = subscribe.Id
+		}
+		r.post(conn, SUBSCRIBES, subscribeMap, DefaultTag, DefaultInt, DefaultInt)
 		go r.connectionListen(conn, service.Id)
 		return
 	}
