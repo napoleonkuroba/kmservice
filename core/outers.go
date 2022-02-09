@@ -6,11 +6,9 @@ import (
 	"github.com/go-xorm/xorm"
 	socketio "github.com/googollee/go-socket.io"
 	"github.com/sirupsen/logrus"
-	"math/rand"
 	"net"
 	"os"
 	"strings"
-	"time"
 )
 
 //
@@ -60,6 +58,7 @@ func NewCenter(sql *xorm.Engine, persistencePath string, logger *logrus.Logger, 
 		ServiceActive:       make(map[int64]ServiceState),
 		webSocketServer:     socketio.NewServer(nil),
 		logger:              logger,
+		linkPool:            make(map[string]LinkInfo),
 		socketPool:          make(map[int64]net.Conn),
 		connNum:             0,
 		maxPoolSize:         poolsize,
@@ -118,13 +117,7 @@ func (r *RegisterCenter) Run(port string) {
 //  @return error
 //
 func (r *RegisterCenter) RegisterService(service MicroService) (string, error) {
-	rand := rand.New(rand.NewSource(time.Now().UnixNano()))
-	bytes := make([]byte, 20)
-	for i := 0; i < 20; i++ {
-		b := rand.Intn(26) + 65
-		bytes[i] = byte(b)
-	}
-	token := string(bytes)
+	token := createToken("")
 	service.Token = token
 	_, err := r.sqlClient.Insert(&service)
 	if err != nil {

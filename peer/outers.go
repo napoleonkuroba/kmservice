@@ -1,9 +1,11 @@
 package peer
 
 import (
+	"encoding/json"
 	"github.com/go-xorm/xorm"
 	"github.com/hducqa/kmservice/core"
 	"github.com/sirupsen/logrus"
+	"net"
 	"os"
 	"strings"
 	"time"
@@ -47,11 +49,12 @@ func NewPeer(config PeerConfig, sql *xorm.Engine, logger *logrus.Logger, maxerro
 		getList:           make(map[int64]bool),
 		updateRequestList: make(map[int64]int),
 		subscribeKeys:     make(map[string]int64),
-		pendingList:       make(map[string]core.PendingGram),
+		pendingList:       make(map[string]PendingGram),
+		LinkApplys:        make(map[string]core.DataGram),
+		LinkInfos:         make(map[string]core.LinkInfo),
 		logger:            logger,
 		sqlClient:         sql,
 		maxErrorTimes:     maxerrorTimes,
-		connection:        nil,
 		errorTimes:        10,
 		filePath:          persistencePath,
 	}
@@ -92,7 +95,7 @@ func (p *Peer) UpdateRequest(keyStr string, new interface{}) bool {
 		New:    new,
 	}
 	p.post(core.DataGram{
-		Tag:       p.createTag(),
+		Tag:       p.createTag(core.UPDATE),
 		ServiceId: p.ServiceId,
 		Data: core.Data{
 			TimeStamp: time.Now(),
@@ -134,7 +137,7 @@ func (p *Peer) UpdateRequest(keyStr string, new interface{}) bool {
 func (p *Peer) POST(postTitle core.PostTitle, key string, body interface{}) {
 	keyId := p.subscribeKeys[key]
 	data := core.DataGram{
-		Tag:       p.createTag(),
+		Tag:       p.createTag(postTitle),
 		ServiceId: p.ServiceId,
 		Data: core.Data{
 			Title:     postTitle,
@@ -170,7 +173,7 @@ func (p *Peer) GET(keys []string) error {
 			Body:      keyIds,
 		},
 		ServiceId: p.ServiceId,
-		Tag:       p.createTag(),
+		Tag:       p.createTag(core.GET),
 	}
 	err := p.post(apply)
 	if err != nil {
@@ -178,6 +181,112 @@ func (p *Peer) GET(keys []string) error {
 	}
 	for _, keyId := range keyIds {
 		p.getList[keyId] = true
+	}
+	return nil
+}
+
+//
+//  CreateLink
+//  @Description: 向注册中心发送创建连接请求
+//  @receiver p
+//
+func (p *Peer) CreateLink(port string, key string) {
+	dataGram := core.DataGram{
+		Tag:       p.createTag(core.LINK),
+		ServiceId: p.ServiceId,
+		Data: core.Data{
+			Title:     core.LINK,
+			Key:       0,
+			TimeStamp: time.Now(),
+			Body: core.LinkApply{
+				Port: port,
+				Key:  key,
+			},
+		},
+	}
+	p.LinkApplys[dataGram.Tag] = dataGram
+	p.post(dataGram)
+}
+
+//
+//  Link
+//  @Description: 创建服务间的连接
+//  @receiver p
+//
+func (p *Peer) Link(key string, desc string) *Link {
+	p.post(core.DataGram{
+		Tag:       p.createTag(core.FIND_LINK),
+		ServiceId: p.ServiceId,
+		Data: core.Data{
+			Title:     core.FIND_LINK,
+			Key:       0,
+			TimeStamp: time.Now(),
+			Body:      key,
+		},
+	})
+	times := 100
+	for {
+		if times <= 0 {
+			p.logger.Error("link time out :", key)
+			return nil
+		}
+		_, ok := p.LinkInfos[key]
+		if !ok {
+			times--
+			time.Sleep(10 * time.Second)
+		} else {
+			break
+		}
+	}
+	info := p.LinkInfos[key]
+
+	apply := LinkApply{
+		Token: info.Token,
+		Desc:  desc,
+	}
+	conn, err := net.Dial("tcp", info.Host+":"+info.Port)
+	if err != nil {
+		p.logger.Error(err.Error())
+		return nil
+	}
+
+	//发送服务连接请求
+	bytes, err := json.Marshal(apply)
+	if err != nil {
+		p.logger.Error(err.Error())
+		return nil
+	}
+	_, err = conn.Write(bytes)
+	if err != nil {
+		p.logger.Error(err.Error())
+		return nil
+	}
+
+	//接收服务器响应
+	buff := make([]byte, 1024)
+	length, err := conn.Read(buff)
+	if err != nil {
+		p.logger.Error(err.Error())
+		return nil
+	}
+	var data LinkGram
+	err = json.Unmarshal(buff[:length], &data)
+	if err != nil {
+		p.logger.Error(err.Error())
+		return nil
+	}
+	if data.Type == SUCCESS {
+		link := Link{
+			logger:     p.logger,
+			Token:      info.Token,
+			LinkNumber: 0,
+			LinkFields: make([]LinkField, 0),
+		}
+		link.LinkFields = append(link.LinkFields, LinkField{
+			conn:        conn,
+			GramChannel: make(chan LinkGram, 2000),
+		})
+		return &link
 	}
 	return nil
 }

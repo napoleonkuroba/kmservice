@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"os"
 	"time"
@@ -223,12 +224,63 @@ func (r *RegisterCenter) handle(conn net.Conn, datagram DataGram, id int64) {
 	case API_LIST:
 		r.handleAPIlist(conn, datagram, id)
 		return
+	case LINK:
+		r.handleLink(conn, datagram)
+		return
+	case FIND_LINK:
+		r.handleFindLink(conn, datagram)
+		return
 	}
 	r.post(conn, EXCEPTION, REQUEST_TYPE_EXCEPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
 	return
 }
 
 //region 处理请求
+
+func (r RegisterCenter) handleFindLink(conn net.Conn, datagram DataGram) {
+	bytes, err := json.Marshal(datagram.Data.Body)
+	if err != nil {
+		r.post(conn, EXCEPTION, FINDLINK_DATA_FORM_EXECPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
+		return
+	}
+	var key string
+	err = json.Unmarshal(bytes, &key)
+	if err != nil {
+		r.post(conn, EXCEPTION, FINDLINK_DATA_FORM_EXECPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
+		return
+	}
+	info, ok := r.linkPool[key]
+	if !ok {
+		r.post(conn, EXCEPTION, LINK_NOT_EXIST, datagram.Tag, datagram.ServiceId, DefaultInt)
+		return
+	}
+	r.post(conn, FIND_LINK, info, DefaultTag, DefaultInt, DefaultInt)
+}
+
+func (r *RegisterCenter) handleLink(conn net.Conn, datagram DataGram) {
+	bytes, err := json.Marshal(datagram.Data.Body)
+	if err != nil {
+		r.post(conn, EXCEPTION, LINK_DATA_FORM_EXECPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
+		return
+	}
+	var apply LinkApply
+	err = json.Unmarshal(bytes, &apply)
+	if err != nil || apply.Port == "" || apply.Key == "" {
+		r.post(conn, EXCEPTION, LINK_DATA_FORM_EXECPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
+		return
+	}
+	token := createToken(apply.Key)
+	ip := conn.RemoteAddr()
+	linkInfo := LinkInfo{
+		Key:   apply.Key,
+		Host:  ip.String(),
+		Port:  apply.Port,
+		Token: token,
+	}
+	r.linkPool[apply.Key] = linkInfo
+	r.post(conn, LINK_SUBMIT, linkInfo, DefaultTag, DefaultInt, DefaultInt)
+	return
+}
 
 func (r *RegisterCenter) handleUpdate(conn net.Conn, datagram DataGram, id int64) {
 	bytes, err := json.Marshal(datagram.Data.Body)
@@ -436,4 +488,18 @@ func (r *RegisterCenter) post(conn net.Conn, title PostTitle, data interface{}, 
 		conn.Close()
 		r.logger.Error(err.Error())
 	}
+}
+
+func createToken(key string) string {
+	rand := rand.New(rand.NewSource(time.Now().UnixNano()))
+	bytes := make([]byte, 20)
+	for i := 0; i < 20; i++ {
+		b := rand.Intn(26) + 65
+		bytes[i] = byte(b)
+	}
+	token := string(bytes)
+	if key != "" {
+		token += "-" + key
+	}
+	return token
 }

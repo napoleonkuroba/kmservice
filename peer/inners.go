@@ -89,7 +89,7 @@ func (p *Peer) listen() {
 		case core.IS_ACTIVE:
 			{
 				p.post(core.DataGram{
-					Tag:       p.createTag(),
+					Tag:       p.createTag(core.GET),
 					ServiceId: p.ServiceId,
 					Data: core.Data{
 						TimeStamp: time.Now(),
@@ -116,6 +116,16 @@ func (p *Peer) listen() {
 			{
 				tag := data.Data.Body.(string)
 				delete(p.pendingList, tag)
+			}
+		case core.LINK_SUBMIT:
+			{
+				p.handleLinkSubmit(data)
+				continue
+			}
+		case core.FIND_LINK:
+			{
+				p.handleFindLink(data)
+				continue
 			}
 		}
 	}
@@ -173,6 +183,49 @@ func (p *Peer) handleException(data core.DataGram) {
 }
 
 //
+//  handleLinkSubmit
+//  @Description: 处理同意link请求
+//  @receiver p
+//  @param data
+//
+func (p *Peer) handleLinkSubmit(data core.DataGram) {
+	bytes, err := json.Marshal(data.Data.Body)
+	if err != nil {
+		p.logger.Error(err.Error())
+		return
+	}
+	var info core.LinkInfo
+	err = json.Unmarshal(bytes, &info)
+	if err != nil {
+		p.logger.Error(err.Error())
+		return
+	}
+	delete(p.LinkApplys, info.Key)
+	go CreateLink(p.logger, info.Token, info.Port)
+}
+
+//
+//  handleFindLink
+//  @Description: 处理 获取link配置 请求
+//  @receiver p
+//  @param data
+//
+func (p *Peer) handleFindLink(data core.DataGram) {
+	bytes, err := json.Marshal(data.Data.Body)
+	if err != nil {
+		p.logger.Error(err.Error())
+		return
+	}
+	var info core.LinkInfo
+	err = json.Unmarshal(bytes, &info)
+	if err != nil {
+		p.logger.Error(err.Error())
+		return
+	}
+	p.LinkInfos[info.Key] = info
+}
+
+//
 //  PushData
 //  @Description: 向服务端推送数据
 //  @receiver p
@@ -191,16 +244,19 @@ func (p *Peer) post(data core.DataGram) error {
 	storage := DataGramStorage{
 		ServiceId: p.ServiceId,
 		Tag:       data.Tag,
+		PostType:  data.Data.Title,
 	}
-	go func() {
-		p.sqlClient.Insert(&storage)
-		fileBytes, _ := json.Marshal(data)
-		f, _ := os.OpenFile(p.filePath+data.Tag+strconv.Itoa(int(p.ServiceId)), os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
-		defer f.Close()
-		n, _ := f.Seek(0, os.SEEK_END)
-		_, err = f.WriteAt(fileBytes, n)
-	}()
-	p.pendingList[data.Tag] = core.PendingGram{
+	if data.Data.Title != core.IS_ACTIVE {
+		go func() {
+			p.sqlClient.Insert(&storage)
+			fileBytes, _ := json.Marshal(data)
+			f, _ := os.OpenFile(p.filePath+data.Tag+strconv.Itoa(int(p.ServiceId)), os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
+			defer f.Close()
+			n, _ := f.Seek(0, os.SEEK_END)
+			_, err = f.WriteAt(fileBytes, n)
+		}()
+	}
+	p.pendingList[data.Tag] = PendingGram{
 		Time:        time.Now(),
 		ResendTimes: 0,
 		Message:     data,
@@ -215,14 +271,14 @@ func (p *Peer) post(data core.DataGram) error {
 //  @receiver p
 //  @return string
 //
-func (p Peer) createTag() string {
+func (p Peer) createTag(title core.PostTitle) string {
 	rand := rand.New(rand.NewSource(time.Now().UnixNano()))
 	bytes := make([]byte, 20)
 	for i := 0; i < 20; i++ {
 		b := rand.Intn(26) + 65
 		bytes[i] = byte(b)
 	}
-	return string(bytes) + "-" + strconv.Itoa(int(p.ServiceId))
+	return string(bytes) + "-" + strconv.Itoa(int(p.ServiceId)) + "-" + strconv.Itoa(int(title))
 }
 
 //
@@ -274,7 +330,7 @@ func (p *Peer) get(key int64) error {
 			Body:      key,
 		},
 		ServiceId: p.ServiceId,
-		Tag:       p.createTag(),
+		Tag:       p.createTag(core.GET),
 	}
 	err := p.post(apply)
 	if err != nil {
@@ -303,6 +359,7 @@ func (p *Peer) resend() {
 				bytes, _ := json.Marshal(item.Message)
 				p.connection.Write(bytes)
 			}
+			item.Time = time.Now()
 			item.ResendTimes++
 		}
 	}

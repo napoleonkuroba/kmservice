@@ -16,6 +16,7 @@ type PostTitle int
 const (
 	_ PostTitle = iota
 	GET
+	LINK
 	UPDATE
 	CONFIRM
 	SUCCESS
@@ -24,19 +25,24 @@ const (
 	API_LIST
 	EXCEPTION
 	IS_ACTIVE
+	FIND_LINK
 	SUBSCRIBES
+	LINK_SUBMIT
 )
 
 const (
-	NO_SUBSCRIBE_INFO          = "NO_SUBSCRIBE_INFO"
-	KEY_NOT_EXIST              = "KEY_NOT_EXIST"
-	DATA_LOCKED                = "DATA_LOCKED"
-	WITHOUT_PERMISSION         = "WITHOUT_PERMISSION"
-	ORIGINAL_DATA_EXPIRED      = "ORIGINAL_DATA_EXPIRED"
-	REQUEST_TYPE_EXCEPTION     = "REQUEST_TYPE_EXCEPTION"
-	GET_DATA_FORM_EXECPTION    = "GET_DATA_FORM_EXECPTION"
-	API_DATA_FORM_EXECPTION    = "API_DATA_FORM_EXECPTION"
-	UPDATE_DATA_FORM_EXCEPTION = "UPDATE_DATA_FORM_EXCEPTION"
+	NO_SUBSCRIBE_INFO            = "NO_SUBSCRIBE_INFO"
+	KEY_NOT_EXIST                = "KEY_NOT_EXIST"
+	DATA_LOCKED                  = "DATA_LOCKED"
+	LINK_NOT_EXIST               = "LINK_NOT_EXIST"
+	WITHOUT_PERMISSION           = "WITHOUT_PERMISSION"
+	ORIGINAL_DATA_EXPIRED        = "ORIGINAL_DATA_EXPIRED"
+	REQUEST_TYPE_EXCEPTION       = "REQUEST_TYPE_EXCEPTION"
+	GET_DATA_FORM_EXECPTION      = "GET_DATA_FORM_EXECPTION"
+	API_DATA_FORM_EXECPTION      = "API_DATA_FORM_EXECPTION"
+	LINK_DATA_FORM_EXECPTION     = "LINK_DATA_FORM_EXECPTION"
+	UPDATE_DATA_FORM_EXCEPTION   = "UPDATE_DATA_FORM_EXCEPTION"
+	FINDLINK_DATA_FORM_EXECPTION = "FINDLINK_DATA_FORM_EXECPTION"
 )
 
 type ServiceState int
@@ -47,12 +53,6 @@ const (
 	Pending
 	Active
 )
-
-type PendingGram struct {
-	Time        time.Time
-	ResendTimes int
-	Message     DataGram
-}
 
 type RegisterCenter struct {
 	persistenceFilePath string                 //持久化文件路径
@@ -65,6 +65,7 @@ type RegisterCenter struct {
 	webSocketServer *socketio.Server //websocket服务
 	logger          *logrus.Logger   //日志管理
 
+	linkPool    map[string]LinkInfo
 	socketPool  map[int64]net.Conn //TCP连接池
 	connNum     int                //当前维护连接数
 	maxPoolSize int                //最大连接数量
@@ -146,4 +147,16 @@ func (r RegisterCenter) PackageFile() FileStorage {
 	return FileStorage{
 		DataMap: r.DataMap,
 	}
+}
+
+type LinkInfo struct {
+	Key   string `json:"key"`
+	Host  string `json:"host"`
+	Port  string `json:"port"`
+	Token string `json:"token"`
+}
+
+type LinkApply struct {
+	Port string `json:"port"`
+	Key  string `json:"key"`
 }
