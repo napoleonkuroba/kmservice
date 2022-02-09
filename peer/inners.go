@@ -127,6 +127,21 @@ func (p *Peer) listen() {
 				p.handleFindLink(data)
 				continue
 			}
+		case core.SUBSCRIBES:
+			{
+				subscribeMap := make(map[string]int64)
+				bytes, err := json.Marshal(data.Data.Body)
+				if err != nil {
+					p.logger.Error(err.Error())
+					return
+				}
+				err = json.Unmarshal(bytes, subscribeMap)
+				if err != nil {
+					p.logger.Error(err.Error())
+					return
+				}
+				p.subscribeKeys = subscribeMap
+			}
 		}
 	}
 }
