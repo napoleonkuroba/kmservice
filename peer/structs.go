@@ -14,9 +14,9 @@ const (
 	_ LinkType = iota
 	STOP
 	START
-	CUSTOM
 	CONFIRM
 	SUCCESS
+	TRANSFER
 )
 
 type Peer struct {
@@ -82,7 +82,7 @@ type LinkGram struct {
 type LinkField struct {
 	stop        bool
 	conn        net.Conn
-	GramChannel chan LinkGram
+	DataChannel chan interface{}
 	pending     map[string]PendingLinkGram
 }
 

@@ -286,7 +286,7 @@ func (p *Peer) Link(key string, desc string) *Link {
 		}
 		link.LinkFields = append(link.LinkFields, LinkField{
 			conn:        conn,
-			GramChannel: make(chan LinkGram, 2000),
+			GramChannel: make(chan interface{}, 2000),
 		})
 		return &link
 	}

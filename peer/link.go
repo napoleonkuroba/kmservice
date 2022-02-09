@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/sirupsen/logrus"
+	"math/rand"
 	"net"
 	"time"
 )
@@ -73,7 +74,7 @@ func (l *Link) linkListen(port string) {
 		fmt.Println(apply.Desc)
 		l.LinkFields = append(l.LinkFields, LinkField{
 			conn:        conn,
-			GramChannel: make(chan LinkGram, 2000),
+			DataChannel: make(chan interface{}, 2000),
 		})
 		l.LinkNumber++
 	}
@@ -107,6 +108,22 @@ func (l *LinkField) post(data LinkGram, logger *logrus.Logger) {
 }
 
 //
+//  createTag
+//  @Description: 创建随机tag
+//  @return string
+//
+func createTag() string {
+	rand := rand.New(rand.NewSource(time.Now().UnixNano()))
+	bytes := make([]byte, 20)
+	for i := 0; i < 20; i++ {
+		b := rand.Intn(26) + 65
+		bytes[i] = byte(b)
+	}
+	tag := string(bytes)
+	return tag
+}
+
+//
 //  DataTransport
 //  @Description: 数据传输
 //  @receiver l
@@ -115,13 +132,17 @@ func (l *LinkField) post(data LinkGram, logger *logrus.Logger) {
 func (l *LinkField) DataTransport(logger *logrus.Logger) {
 	go l.handleResponse(logger)
 	go l.resend(logger)
-	for data := range l.GramChannel {
+	for data := range l.DataChannel {
 		for {
 			if l.stop {
 				continue
 			}
 		}
-		l.post(data, logger)
+		l.post(LinkGram{
+			Tag:  createTag(),
+			Type: TRANSFER,
+			Body: data,
+		}, logger)
 	}
 }
 
@@ -219,9 +240,9 @@ func (l *LinkField) DataReceiver(logger *logrus.Logger) {
 			Type: CONFIRM,
 			Body: nil,
 		}, logger)
-		l.GramChannel <- data
+		l.DataChannel <- data.Body
 		go func() {
-			for len(l.GramChannel) > ChannelScale {
+			for len(l.DataChannel) > ChannelScale {
 				if l.stop != true {
 					l.post(LinkGram{
 						Tag:  "",
