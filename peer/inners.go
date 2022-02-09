@@ -201,7 +201,8 @@ func (p *Peer) handleLinkSubmit(data core.DataGram) {
 		return
 	}
 	delete(p.LinkApplys, info.Key)
-	go CreateLink(p.logger, info.Token, info.Port)
+	link := createLink(p.logger, info.Token, info.Port)
+	p.Links[info.Key] = link
 }
 
 //

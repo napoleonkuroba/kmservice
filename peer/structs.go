@@ -14,6 +14,7 @@ const (
 	_ LinkType = iota
 	STOP
 	START
+	CUSTOM
 	CONFIRM
 	SUCCESS
 )
@@ -33,6 +34,8 @@ type Peer struct {
 
 	LinkApplys map[string]core.DataGram //连接请求缓存
 	LinkInfos  map[string]core.LinkInfo //连接配置
+
+	Links map[string]*Link
 
 	logger    *logrus.Logger
 	sqlClient *xorm.Engine

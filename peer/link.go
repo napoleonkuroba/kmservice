@@ -19,14 +19,15 @@ const ChannelScale = 1500
 //  @param token
 //  @param port
 //
-func CreateLink(logger *logrus.Logger, token string, port string) {
+func createLink(logger *logrus.Logger, token string, port string) *Link {
 	link := Link{
 		logger:     logger,
 		Token:      token,
 		LinkNumber: 0,
 		LinkFields: make([]LinkField, 0),
 	}
-	link.linkListen(port)
+	go link.linkListen(port)
+	return &link
 }
 
 //
@@ -134,7 +135,7 @@ func (l *LinkField) resend(logger *logrus.Logger) {
 	for {
 		time.Sleep(1 * time.Minute)
 		for key, item := range l.pending {
-			if item.resendTimes > 10 {
+			if item.resendTimes > MaxResendTimes {
 				logger.Error("the datagram has sent to many times : ", item.linkGram)
 				delete(l.pending, key)
 				continue

@@ -52,9 +52,11 @@ func NewPeer(config PeerConfig, sql *xorm.Engine, logger *logrus.Logger, maxerro
 		pendingList:       make(map[string]PendingGram),
 		LinkApplys:        make(map[string]core.DataGram),
 		LinkInfos:         make(map[string]core.LinkInfo),
+		Links:             make(map[string]*Link),
 		logger:            logger,
 		sqlClient:         sql,
 		maxErrorTimes:     maxerrorTimes,
+		connection:        nil,
 		errorTimes:        10,
 		filePath:          persistencePath,
 	}
