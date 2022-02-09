@@ -135,7 +135,7 @@ func (p *Peer) listen() {
 					p.logger.Error(err.Error())
 					return
 				}
-				err = json.Unmarshal(bytes, subscribeMap)
+				err = json.Unmarshal(bytes, &subscribeMap)
 				if err != nil {
 					p.logger.Error(err.Error())
 					return
