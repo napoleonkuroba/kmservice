@@ -285,8 +285,10 @@ func (p *Peer) Link(key string, desc string) *Link {
 			LinkFields: make([]LinkField, 0),
 		}
 		link.LinkFields = append(link.LinkFields, LinkField{
-			conn:        conn,
-			DataChannel: make(chan interface{}, 2000),
+			conn:          conn,
+			DataChannel:   make(chan interface{}, 2000),
+			CustomChannel: make(chan LinkGram, 2000),
+			pending:       make(map[string]PendingLinkGram),
 		})
 		return &link
 	}

@@ -73,8 +73,10 @@ func (l *Link) linkListen(port string) {
 		}
 		fmt.Println(apply.Desc)
 		l.LinkFields = append(l.LinkFields, LinkField{
-			conn:        conn,
-			DataChannel: make(chan interface{}, 2000),
+			conn:          conn,
+			DataChannel:   make(chan interface{}, 2000),
+			CustomChannel: make(chan LinkGram, 2000),
+			pending:       make(map[string]PendingLinkGram),
 		})
 		l.LinkNumber++
 	}
@@ -124,14 +126,14 @@ func createTag() string {
 }
 
 //
-//  DataTransport
-//  @Description: 数据传输
+//  AccelerateLink
+//  @Description: 数据单向传输，单向响应
 //  @receiver l
 //  @param logger
 //
-func (l *LinkField) DataTransport(logger *logrus.Logger) {
+func (l *LinkField) AccelerateLink(logger *logrus.Logger) {
 	go l.handleResponse(logger)
-	go l.resend(logger)
+	go l.Resend(logger)
 	for data := range l.DataChannel {
 		for {
 			if l.stop {
@@ -147,12 +149,30 @@ func (l *LinkField) DataTransport(logger *logrus.Logger) {
 }
 
 //
+//  POST
+//  @Description: 向link对象发送请求
+//  @receiver l
+//  @param linkType
+//  @param customKey	自定义键（linkType需为custom）
+//  @param data	传输数据
+//  @param logger
+//
+func (l *LinkField) POST(linkType LinkType, customKey string, data interface{}, logger *logrus.Logger) {
+	l.post(LinkGram{
+		Tag:       createTag(),
+		Type:      linkType,
+		CustomKey: customKey,
+		Body:      data,
+	}, logger)
+}
+
+//
 //  resend
 //  @Description: 重发数据报
 //  @receiver l
 //  @param logger
 //
-func (l *LinkField) resend(logger *logrus.Logger) {
+func (l *LinkField) Resend(logger *logrus.Logger) {
 	for {
 		time.Sleep(1 * time.Minute)
 		for key, item := range l.pending {
@@ -208,6 +228,10 @@ func (l *LinkField) handleResponse(logger *logrus.Logger) {
 				l.stop = false
 				continue
 			}
+		case CUSTOM:
+			{
+				l.CustomChannel <- data
+			}
 		}
 	}
 }
@@ -221,18 +245,22 @@ func (l *LinkField) handleResponse(logger *logrus.Logger) {
 func (l *LinkField) DataReceiver(logger *logrus.Logger) {
 	errorTimes := 10
 	for {
+		if errorTimes <= 0 {
+			logger.Error("too many errors!")
+			break
+		}
 		buff := make([]byte, 204800)
 		length, err := l.conn.Read(buff)
 		if err != nil {
 			logger.Error(err.Error())
-			errorTimes++
+			errorTimes--
 			continue
 		}
 		var data LinkGram
 		err = json.Unmarshal(buff[:length], &data)
 		if err != nil {
 			logger.Error(err.Error())
-			errorTimes++
+			errorTimes--
 			continue
 		}
 		l.post(LinkGram{
@@ -240,7 +268,11 @@ func (l *LinkField) DataReceiver(logger *logrus.Logger) {
 			Type: CONFIRM,
 			Body: nil,
 		}, logger)
-		l.DataChannel <- data.Body
+		if data.Type == CUSTOM {
+			l.CustomChannel <- data
+		} else {
+			l.DataChannel <- data.Body
+		}
 		go func() {
 			for len(l.DataChannel) > ChannelScale {
 				if l.stop != true {

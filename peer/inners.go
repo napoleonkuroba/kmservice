@@ -103,7 +103,6 @@ func (p *Peer) listen() {
 				go func() {
 					p.PeerData[data.Data.Key] = data.Data.Body
 					p.getList[data.Data.Key] = false
-					p.logger.Info("Update ", data.Data.Key, data.Data.Body)
 				}()
 				break
 			}

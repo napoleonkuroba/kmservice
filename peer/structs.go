@@ -14,6 +14,7 @@ const (
 	_ LinkType = iota
 	STOP
 	START
+	CUSTOM
 	CONFIRM
 	SUCCESS
 	TRANSFER
@@ -74,16 +75,18 @@ type LinkInfo struct {
 }
 
 type LinkGram struct {
-	Tag  string      `json:"tag"`
-	Type LinkType    `json:"type"`
-	Body interface{} `json:"body"`
+	Tag       string      `json:"tag"`
+	Type      LinkType    `json:"type"`
+	CustomKey string      `json:"customKey"`
+	Body      interface{} `json:"body"`
 }
 
 type LinkField struct {
-	stop        bool
-	conn        net.Conn
-	DataChannel chan interface{}
-	pending     map[string]PendingLinkGram
+	stop          bool
+	conn          net.Conn
+	DataChannel   chan interface{}
+	CustomChannel chan LinkGram
+	pending       map[string]PendingLinkGram
 }
 
 type PendingLinkGram struct {
