@@ -3,6 +3,7 @@ package peer
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/hducqa/kmservice/core"
 	"github.com/sirupsen/logrus"
 	"math/rand"
 	"net"
@@ -20,12 +21,14 @@ const ChannelScale = 1500
 //  @param token
 //  @param port
 //
-func createLink(logger *logrus.Logger, token string, port string) *Link {
+func createLink(logger *logrus.Logger, token string, port string, logClient *core.LogClient) *Link {
 	link := Link{
 		logger:     logger,
+		logClient:  logClient,
 		Token:      token,
 		LinkNumber: 0,
 		LinkFields: make([]LinkField, 0),
+		DataField:  make([]interface{}, 0),
 	}
 	go link.linkListen(port)
 	return &link
@@ -41,6 +44,7 @@ func (l *Link) linkListen(port string) {
 	listen, err := net.Listen("tcp", ":"+port)
 	if err != nil {
 		l.logger.Error(err.Error())
+		go l.logClient.Report(core.Log_Error, err.Error())
 	}
 	l.logger.Info("TCP listening on port :" + port)
 	defer listen.Close()
@@ -52,11 +56,13 @@ func (l *Link) linkListen(port string) {
 		conn, err := listen.Accept()
 		if err != nil {
 			l.logger.Error(err.Error())
+			go l.logClient.Report(core.Log_Error, err.Error())
 		}
 		buff := make([]byte, 2048)
 		length, err := conn.Read(buff)
 		if err != nil {
 			l.logger.Error(err.Error())
+			go l.logClient.Report(core.Log_Error, err.Error())
 			conn.Close()
 			return
 		}
@@ -64,6 +70,7 @@ func (l *Link) linkListen(port string) {
 		err = json.Unmarshal(buff[:length], &apply)
 		if err != nil {
 			l.logger.Error(err.Error())
+			go l.logClient.Report(core.Log_Error, err.Error())
 			conn.Close()
 			return
 		}
@@ -73,10 +80,13 @@ func (l *Link) linkListen(port string) {
 		}
 		fmt.Println(apply.Desc)
 		l.LinkFields = append(l.LinkFields, LinkField{
+			stop:          false,
 			conn:          conn,
 			DataChannel:   make(chan interface{}, 2000),
 			CustomChannel: make(chan LinkGram, 2000),
 			pending:       make(map[string]PendingLinkGram),
+			logger:        l.logger,
+			logClient:     l.logClient,
 		})
 		l.LinkNumber++
 	}
@@ -90,22 +100,25 @@ func (l *Link) linkListen(port string) {
 //  @param logger	日志输出
 //  @return error
 //
-func (l *LinkField) post(data LinkGram, logger *logrus.Logger) {
+func (l *LinkField) post(data LinkGram) {
 	bytes, err := json.Marshal(data)
 	if err != nil {
-		logger.Error(err.Error())
+		l.logger.Error(err.Error())
+		go l.logClient.Report(core.Log_Error, err.Error())
 		return
 	}
 	_, err = l.conn.Write(bytes)
 	if err != nil {
-		logger.Error(err.Error())
+		l.logger.Error(err.Error())
+		go l.logClient.Report(core.Log_Error, err.Error())
 		return
 	}
 	l.pending[data.Tag] = PendingLinkGram{
 		linkGram:    data,
 		resendTimes: 0,
 	}
-	logger.Info("push data : ", data)
+	l.logger.Info("push data : ", data)
+
 	return
 }
 
@@ -131,9 +144,9 @@ func createTag() string {
 //  @receiver l
 //  @param logger
 //
-func (l *LinkField) AccelerateLink(logger *logrus.Logger) {
-	go l.handleResponse(logger)
-	go l.Resend(logger)
+func (l *LinkField) AccelerateLink() {
+	go l.handleResponse()
+	go l.Resend()
 	for data := range l.DataChannel {
 		for {
 			if l.stop {
@@ -144,7 +157,7 @@ func (l *LinkField) AccelerateLink(logger *logrus.Logger) {
 			Tag:  createTag(),
 			Type: TRANSFER,
 			Body: data,
-		}, logger)
+		})
 	}
 }
 
@@ -157,13 +170,13 @@ func (l *LinkField) AccelerateLink(logger *logrus.Logger) {
 //  @param data	传输数据
 //  @param logger
 //
-func (l *LinkField) POST(linkType LinkType, customKey string, data interface{}, logger *logrus.Logger) {
+func (l *LinkField) POST(linkType LinkType, customKey string, data interface{}) {
 	l.post(LinkGram{
 		Tag:       createTag(),
 		Type:      linkType,
 		CustomKey: customKey,
 		Body:      data,
-	}, logger)
+	})
 }
 
 //
@@ -172,12 +185,14 @@ func (l *LinkField) POST(linkType LinkType, customKey string, data interface{}, 
 //  @receiver l
 //  @param logger
 //
-func (l *LinkField) Resend(logger *logrus.Logger) {
+func (l *LinkField) Resend() {
 	for {
 		time.Sleep(1 * time.Minute)
 		for key, item := range l.pending {
 			if item.resendTimes > MaxResendTimes {
-				logger.Error("the datagram has sent to many times : ", item.linkGram)
+				l.logger.Error("the datagram has sent to many times : ", item.linkGram)
+				bytes, _ := json.Marshal(item.linkGram)
+				go l.logClient.Report(core.Log_Error, "the datagram has sent to many times : "+string(bytes))
 				delete(l.pending, key)
 				continue
 			}
@@ -198,18 +213,20 @@ func (l *LinkField) Resend(logger *logrus.Logger) {
 //  @receiver l
 //  @param logger
 //
-func (l *LinkField) handleResponse(logger *logrus.Logger) {
+func (l *LinkField) handleResponse() {
 	for {
 		buff := make([]byte, 2048)
 		length, err := l.conn.Read(buff)
 		if err != nil {
-			logger.Error(err.Error())
+			l.logger.Error(err.Error())
+			go l.logClient.Report(core.Log_Error, err.Error())
 			continue
 		}
 		var data LinkGram
 		err = json.Unmarshal(buff[:length], &data)
 		if err != nil {
-			logger.Error(err.Error())
+			l.logger.Error(err.Error())
+			go l.logClient.Report(core.Log_Error, err.Error())
 			continue
 		}
 		switch data.Type {
@@ -242,24 +259,27 @@ func (l *LinkField) handleResponse(logger *logrus.Logger) {
 //  @receiver l
 //  @param logger
 //
-func (l *LinkField) DataReceiver(logger *logrus.Logger) {
+func (l *LinkField) DataReceiver() {
 	errorTimes := 10
 	for {
 		if errorTimes <= 0 {
-			logger.Error("too many errors!")
+			l.logger.Error("too many errors!")
+			go l.logClient.Report(core.Log_Error, "too many errors!")
 			break
 		}
 		buff := make([]byte, 204800)
 		length, err := l.conn.Read(buff)
 		if err != nil {
-			logger.Error(err.Error())
+			l.logger.Error(err.Error())
+			go l.logClient.Report(core.Log_Error, err.Error())
 			errorTimes--
 			continue
 		}
 		var data LinkGram
 		err = json.Unmarshal(buff[:length], &data)
 		if err != nil {
-			logger.Error(err.Error())
+			l.logger.Error(err.Error())
+			go l.logClient.Report(core.Log_Error, err.Error())
 			errorTimes--
 			continue
 		}
@@ -267,7 +287,7 @@ func (l *LinkField) DataReceiver(logger *logrus.Logger) {
 			Tag:  data.Tag,
 			Type: CONFIRM,
 			Body: nil,
-		}, logger)
+		})
 		if data.Type == CUSTOM {
 			l.CustomChannel <- data
 		} else {
@@ -280,7 +300,7 @@ func (l *LinkField) DataReceiver(logger *logrus.Logger) {
 						Tag:  "",
 						Type: STOP,
 						Body: nil,
-					}, logger)
+					})
 				}
 				l.stop = true
 				time.Sleep(5 * time.Second)
@@ -291,7 +311,7 @@ func (l *LinkField) DataReceiver(logger *logrus.Logger) {
 					Tag:  "",
 					Type: START,
 					Body: nil,
-				}, logger)
+				})
 			}
 		}()
 	}

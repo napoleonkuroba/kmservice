@@ -67,12 +67,14 @@ func (p *Peer) listen() {
 	for {
 		if p.errorTimes == 0 {
 			p.logger.Error("stopped for getting error too many times")
+			go p.LogClient.Report(core.Log_Error, "stopped for getting error too many times")
 			return
 		}
 		buff := make([]byte, 1048576)
 		length, err := p.connection.Read(buff)
 		if err != nil {
 			p.logger.Error(err.Error())
+			go p.LogClient.Report(core.Log_Error, err.Error())
 			p.errorTimes--
 			continue
 		}
@@ -80,6 +82,7 @@ func (p *Peer) listen() {
 		err = json.Unmarshal(buff[:length], &data)
 		if err != nil {
 			p.logger.Error(err.Error())
+			go p.LogClient.Report(core.Log_Error, err.Error())
 			p.errorTimes--
 			continue
 		}
@@ -132,11 +135,13 @@ func (p *Peer) listen() {
 				bytes, err := json.Marshal(data.Data.Body)
 				if err != nil {
 					p.logger.Error(err.Error())
+					go p.LogClient.Report(core.Log_Error, err.Error())
 					return
 				}
 				err = json.Unmarshal(bytes, &subscribeMap)
 				if err != nil {
 					p.logger.Error(err.Error())
+					go p.LogClient.Report(core.Log_Error, err.Error())
 					return
 				}
 				p.subscribeKeys = subscribeMap
@@ -176,12 +181,14 @@ func (p *Peer) handleException(data core.DataGram) {
 			bytes, err := json.Marshal(data.Data.Body)
 			if err != nil {
 				p.logger.Error(err.Error())
+				go p.LogClient.Report(core.Log_Error, err.Error())
 				break
 			}
 			var id int64
 			err = json.Unmarshal(bytes, &id)
 			if err != nil {
 				p.logger.Error(err.Error())
+				go p.LogClient.Report(core.Log_Error, err.Error())
 				break
 			}
 			p.getList[id] = false
@@ -206,16 +213,18 @@ func (p *Peer) handleLinkSubmit(data core.DataGram) {
 	bytes, err := json.Marshal(data.Data.Body)
 	if err != nil {
 		p.logger.Error(err.Error())
+		go p.LogClient.Report(core.Log_Error, err.Error())
 		return
 	}
 	var info core.LinkInfo
 	err = json.Unmarshal(bytes, &info)
 	if err != nil {
 		p.logger.Error(err.Error())
+		go p.LogClient.Report(core.Log_Error, err.Error())
 		return
 	}
 	delete(p.LinkApplys, info.Key)
-	link := createLink(p.logger, info.Token, info.Port)
+	link := createLink(p.logger, info.Token, info.Port, p.LogClient)
 	p.Links[info.Key] = link
 }
 
@@ -229,12 +238,15 @@ func (p *Peer) handleFindLink(data core.DataGram) {
 	bytes, err := json.Marshal(data.Data.Body)
 	if err != nil {
 		p.logger.Error(err.Error())
+		go p.LogClient.Report(core.Log_Error, err.Error())
+		go p.LogClient.Report(core.Log_Error, err.Error())
 		return
 	}
 	var info core.LinkInfo
 	err = json.Unmarshal(bytes, &info)
 	if err != nil {
 		p.logger.Error(err.Error())
+		go p.LogClient.Report(core.Log_Error, err.Error())
 		return
 	}
 	p.LinkInfos[info.Key] = info
@@ -309,24 +321,28 @@ func (p *Peer) dataGramLog(data core.DataGram) {
 	}
 	_, err := p.sqlClient.Get(&storage)
 	if err != nil {
-		p.logger.Error(err.Error())
-		p.logger.Error(data.Tag, " ", data.Data.Title)
+		p.logger.Error(err.Error(), " ", data.Tag, " ", data.Data.Title)
+		go p.LogClient.Report(core.Log_Error, err.Error()+" tag: "+data.Tag+" title: "+strconv.Itoa(int(data.Data.Title)))
 	} else {
 		file, err := os.Open(p.filePath + data.Tag + strconv.Itoa(int(storage.ServiceId)))
 		defer file.Close()
 		if err != nil {
 			p.logger.Error(err.Error())
+			go p.LogClient.Report(core.Log_Error, err.Error())
 		}
 		bytes, err := ioutil.ReadAll(file)
 		if err != nil {
 			p.logger.Error(err.Error())
+			go p.LogClient.Report(core.Log_Error, err.Error())
 		}
 		var dataBody core.Data
 		err = json.Unmarshal(bytes, &dataBody)
 		if err != nil {
 			p.logger.Error(err.Error())
+			go p.LogClient.Report(core.Log_Error, err.Error())
 		}
 		p.logger.Error(data.Tag, " ", data.Data.Title, " ", dataBody)
+		go p.LogClient.Report(core.Log_Error, "tag"+data.Tag+" title: "+strconv.Itoa(int(data.Data.Title)))
 	}
 }
 
@@ -366,6 +382,8 @@ func (p *Peer) resend() {
 		for key, item := range p.pendingList {
 			if item.ResendTimes > 10 {
 				p.logger.Error("the datagram has sent to many times : ", item.Message)
+				bytes, _ := json.Marshal(item.Message)
+				go p.LogClient.Report(core.Log_Error, "the datagram has sent to many times : "+string(bytes))
 				delete(p.pendingList, key)
 				continue
 			}

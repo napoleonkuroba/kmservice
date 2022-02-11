@@ -8,7 +8,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"net"
 	"os"
+	"runtime"
 	"strings"
+	"time"
 )
 
 //
@@ -21,7 +23,7 @@ import (
 //  @return *RegisterCenter
 //  @return error
 //
-func NewCenter(sql *xorm.Engine, persistencePath string, logger *logrus.Logger, poolsize int) (*RegisterCenter, error) {
+func NewCenter(sql *xorm.Engine, logSql *xorm.Engine, persistencePath string, logger *logrus.Logger, poolsize int) (*RegisterCenter, error) {
 	persistencePath = strings.ReplaceAll(persistencePath, " ", "")
 	if persistencePath == "" {
 		persistencePath = "./"
@@ -48,6 +50,11 @@ func NewCenter(sql *xorm.Engine, persistencePath string, logger *logrus.Logger, 
 		}
 		persistence(FileStorage{DataMap: make(map[int64]interface{})}, persistencePath)
 	}
+	logClient := LogClient{
+		SqlClient:   logSql,
+		ServiceId:   0,
+		ServiceName: "",
+	}
 
 	center := RegisterCenter{
 		persistenceFilePath: persistencePath,
@@ -58,6 +65,7 @@ func NewCenter(sql *xorm.Engine, persistencePath string, logger *logrus.Logger, 
 		ServiceActive:       make(map[int64]ServiceState),
 		webSocketServer:     socketio.NewServer(nil),
 		logger:              logger,
+		logClient:           &logClient,
 		linkPool:            make(map[string]LinkInfo),
 		socketPool:          make(map[int64]net.Conn),
 		connNum:             0,
@@ -68,6 +76,10 @@ func NewCenter(sql *xorm.Engine, persistencePath string, logger *logrus.Logger, 
 	}
 
 	err = sql.Sync2(new(MicroService), new(Subscribe))
+	if err != nil {
+		return nil, err
+	}
+	err = logSql.Sync2(new(Log))
 	if err != nil {
 		return nil, err
 	}
@@ -103,6 +115,7 @@ func (r *RegisterCenter) Run(port string) {
 		conn, err := listen.Accept()
 		if err != nil {
 			r.logger.Error(err.Error())
+			go r.logClient.Report(Log_Error, err.Error())
 		}
 		go r.socketHandle(conn)
 	}
@@ -221,7 +234,8 @@ func (r *RegisterCenter) DeleteService(id int64) error {
 		if changed {
 			_, err = r.sqlClient.Where("Id=?", subscribe.Id).Update(&subscribe)
 			if err != nil {
-				r.logger.Warning(err.Error())
+				r.logger.Error(err.Error())
+				go r.logClient.Report(Log_Error, err.Error())
 			}
 		}
 	}
@@ -417,4 +431,18 @@ func (r RegisterCenter) GetServicePrivileges(subscriber int64) map[int64]Subscri
 		result[key] = privilege
 	}
 	return result
+}
+
+func (l *LogClient) Report(level string, message string) {
+	_, file, line, _ := runtime.Caller(1)
+	log := Log{
+		ServiceId:   l.ServiceId,
+		ServiceName: l.ServiceName,
+		Level:       level,
+		File:        file,
+		Line:        line,
+		Message:     message,
+		Time:        time.Now(),
+	}
+	l.SqlClient.Insert(&log)
 }

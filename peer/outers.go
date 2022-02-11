@@ -20,8 +20,9 @@ import (
 //  @param maxerrorTimes 最大错误次数
 //  @return *Peer
 //
-func NewPeer(config PeerConfig, sql *xorm.Engine, logger *logrus.Logger, maxerrorTimes int, persistencePath string) *Peer {
+func NewPeer(config PeerConfig, sql *xorm.Engine, logSql *xorm.Engine, logger *logrus.Logger, maxerrorTimes int, persistencePath string) *Peer {
 	sql.Sync2(new(DataGramStorage))
+	logSql.Sync2(new(core.Log))
 	persistencePath = strings.ReplaceAll(persistencePath, " ", "")
 	if persistencePath == "" {
 		persistencePath = "./"
@@ -55,10 +56,15 @@ func NewPeer(config PeerConfig, sql *xorm.Engine, logger *logrus.Logger, maxerro
 		Links:             make(map[string]*Link),
 		logger:            logger,
 		sqlClient:         sql,
-		maxErrorTimes:     maxerrorTimes,
-		connection:        nil,
-		errorTimes:        10,
-		filePath:          persistencePath,
+		LogClient: &core.LogClient{
+			SqlClient:   logSql,
+			ServiceId:   config.ServiceId,
+			ServiceName: config.ServiceName,
+		},
+		maxErrorTimes: maxerrorTimes,
+		connection:    nil,
+		errorTimes:    10,
+		filePath:      persistencePath,
 	}
 }
 
@@ -230,6 +236,7 @@ func (p *Peer) Link(key string, desc string) *Link {
 	for {
 		if times <= 0 {
 			p.logger.Error("link time out :", key)
+			go p.LogClient.Report(core.Log_Error, "link time out :"+key)
 			return nil
 		}
 		_, ok := p.LinkInfos[key]
@@ -249,6 +256,7 @@ func (p *Peer) Link(key string, desc string) *Link {
 	conn, err := net.Dial("tcp", info.Host+":"+info.Port)
 	if err != nil {
 		p.logger.Error(err.Error())
+		go p.LogClient.Report(core.Log_Error, err.Error())
 		return nil
 	}
 
@@ -256,11 +264,13 @@ func (p *Peer) Link(key string, desc string) *Link {
 	bytes, err := json.Marshal(apply)
 	if err != nil {
 		p.logger.Error(err.Error())
+		go p.LogClient.Report(core.Log_Error, err.Error())
 		return nil
 	}
 	_, err = conn.Write(bytes)
 	if err != nil {
 		p.logger.Error(err.Error())
+		go p.LogClient.Report(core.Log_Error, err.Error())
 		return nil
 	}
 
@@ -269,26 +279,33 @@ func (p *Peer) Link(key string, desc string) *Link {
 	length, err := conn.Read(buff)
 	if err != nil {
 		p.logger.Error(err.Error())
+		go p.LogClient.Report(core.Log_Error, err.Error())
 		return nil
 	}
 	var data LinkGram
 	err = json.Unmarshal(buff[:length], &data)
 	if err != nil {
 		p.logger.Error(err.Error())
+		go p.LogClient.Report(core.Log_Error, err.Error())
 		return nil
 	}
 	if data.Type == SUCCESS {
 		link := Link{
 			logger:     p.logger,
+			logClient:  p.LogClient,
 			Token:      info.Token,
 			LinkNumber: 0,
 			LinkFields: make([]LinkField, 0),
+			DataField:  make([]interface{}, 0),
 		}
 		link.LinkFields = append(link.LinkFields, LinkField{
+			stop:          false,
 			conn:          conn,
 			DataChannel:   make(chan interface{}, 2000),
 			CustomChannel: make(chan LinkGram, 2000),
 			pending:       make(map[string]PendingLinkGram),
+			logger:        p.logger,
+			logClient:     p.LogClient,
 		})
 		return &link
 	}

@@ -39,6 +39,7 @@ type Peer struct {
 	Links map[string]*Link
 
 	logger    *logrus.Logger
+	LogClient *core.LogClient
 	sqlClient *xorm.Engine
 
 	maxErrorTimes int
@@ -87,6 +88,8 @@ type LinkField struct {
 	DataChannel   chan interface{}
 	CustomChannel chan LinkGram
 	pending       map[string]PendingLinkGram
+	logger        *logrus.Logger
+	logClient     *core.LogClient
 }
 
 type PendingLinkGram struct {
@@ -97,6 +100,7 @@ type PendingLinkGram struct {
 
 type Link struct {
 	logger     *logrus.Logger
+	logClient  *core.LogClient
 	Token      string
 	LinkNumber int
 	LinkFields []LinkField

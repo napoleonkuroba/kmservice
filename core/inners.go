@@ -82,17 +82,20 @@ func (r *RegisterCenter) recovery() {
 	defer file.Close()
 	if err != nil {
 		r.logger.Error(err.Error())
+		go r.logClient.Report(Log_Error, err.Error())
 		return
 	}
 	bytes, err := ioutil.ReadAll(file)
 	if err != nil {
 		r.logger.Error(err.Error())
+		go r.logClient.Report(Log_Error, err.Error())
 		return
 	}
 	var data FileStorage
 	err = json.Unmarshal(bytes, &data)
 	if err != nil {
 		r.logger.Error(err.Error())
+		go r.logClient.Report(Log_Error, err.Error())
 		return
 	}
 	r.DataMap = data.DataMap
@@ -124,6 +127,7 @@ func (r *RegisterCenter) socketHandle(conn net.Conn) {
 	length, err := conn.Read(buff)
 	if err != nil {
 		r.logger.Error(err.Error())
+		go r.logClient.Report(Log_Error, err.Error())
 		conn.Close()
 		return
 	}
@@ -131,6 +135,7 @@ func (r *RegisterCenter) socketHandle(conn net.Conn) {
 	err = json.Unmarshal(buff[:length], &apply)
 	if err != nil {
 		r.logger.Error(err.Error())
+		go r.logClient.Report(Log_Error, err.Error())
 		conn.Close()
 		return
 	}
@@ -140,6 +145,7 @@ func (r *RegisterCenter) socketHandle(conn net.Conn) {
 	exist, err := r.sqlClient.Get(&service)
 	if err != nil {
 		r.logger.Error(err.Error())
+		go r.logClient.Report(Log_Error, err.Error())
 		r.post(conn, FAILURE, err.Error(), DefaultTag, DefaultInt, DefaultInt)
 		time.Sleep(2 * time.Second)
 		conn.Close()
@@ -148,6 +154,7 @@ func (r *RegisterCenter) socketHandle(conn net.Conn) {
 	if !exist {
 		address := conn.RemoteAddr()
 		r.logger.Warning(errors.New("fake connection from " + address.String()))
+		go r.logClient.Report(Log_Error, "fake connection from "+address.String())
 		r.post(conn, FAILURE, err.Error(), DefaultTag, DefaultInt, DefaultInt)
 		time.Sleep(2 * time.Second)
 		conn.Close()
@@ -192,12 +199,14 @@ func (r *RegisterCenter) connectionListen(conn net.Conn, id int64) {
 		length, err := conn.Read(buff)
 		if err != nil {
 			r.logger.Error(err.Error())
+			go r.logClient.Report(Log_Error, err.Error())
 			return
 		}
 		var datagram DataGram
 		err = json.Unmarshal(buff[:length], &datagram)
 		if err != nil {
 			r.logger.Error(err.Error())
+			go r.logClient.Report(Log_Error, err.Error())
 			return
 		}
 		go r.post(conn, CONFIRM, datagram.Tag, DefaultTag, DefaultInt, DefaultInt)
@@ -246,6 +255,7 @@ func (r RegisterCenter) handleFindLink(conn net.Conn, datagram DataGram) {
 	bytes, err := json.Marshal(datagram.Data.Body)
 	if err != nil {
 		r.logger.Error(err.Error())
+		go r.logClient.Report(Log_Error, err.Error())
 		r.post(conn, EXCEPTION, FINDLINK_DATA_FORM_EXECPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
 		return
 	}
@@ -253,6 +263,7 @@ func (r RegisterCenter) handleFindLink(conn net.Conn, datagram DataGram) {
 	err = json.Unmarshal(bytes, &key)
 	if err != nil {
 		r.logger.Error(err.Error())
+		go r.logClient.Report(Log_Error, err.Error())
 		r.post(conn, EXCEPTION, FINDLINK_DATA_FORM_EXECPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
 		return
 	}
@@ -293,6 +304,7 @@ func (r *RegisterCenter) handleUpdate(conn net.Conn, datagram DataGram, id int64
 	bytes, err := json.Marshal(datagram.Data.Body)
 	if err != nil {
 		r.logger.Error(err.Error())
+		go r.logClient.Report(Log_Error, err.Error())
 		r.post(conn, EXCEPTION, UPDATE_DATA_FORM_EXCEPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
 		return
 	}
@@ -300,6 +312,7 @@ func (r *RegisterCenter) handleUpdate(conn net.Conn, datagram DataGram, id int64
 	err = json.Unmarshal(bytes, &data)
 	if err != nil {
 		r.logger.Error(err.Error())
+		go r.logClient.Report(Log_Error, err.Error())
 		r.post(conn, EXCEPTION, UPDATE_DATA_FORM_EXCEPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
 		return
 	}
@@ -330,6 +343,7 @@ func (r *RegisterCenter) handleGet(conn net.Conn, datagram DataGram, id int64) {
 	bytes, err := json.Marshal(datagram.Data.Body)
 	if err != nil {
 		r.logger.Error(err.Error())
+		go r.logClient.Report(Log_Error, err.Error())
 		r.post(conn, EXCEPTION, GET_DATA_FORM_EXECPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
 		return
 	}
@@ -337,6 +351,7 @@ func (r *RegisterCenter) handleGet(conn net.Conn, datagram DataGram, id int64) {
 	err = json.Unmarshal(bytes, &keys)
 	if err != nil {
 		r.logger.Error(err.Error())
+		go r.logClient.Report(Log_Error, err.Error())
 		r.post(conn, EXCEPTION, GET_DATA_FORM_EXECPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
 		return
 	}
@@ -378,12 +393,14 @@ func (r RegisterCenter) handleAPIlist(conn net.Conn, datagram DataGram, id int64
 		bytes, err := json.Marshal(data)
 		if err != nil {
 			r.logger.Error(err.Error())
+			go r.logClient.Report(Log_Error, err.Error())
 			break
 		}
 		var api API
 		err = json.Unmarshal(bytes, &api)
 		if err != nil {
 			r.logger.Error(err.Error())
+			go r.logClient.Report(Log_Error, err.Error())
 			break
 		}
 		apis = append(apis, api)
@@ -431,7 +448,8 @@ func (r *RegisterCenter) persistenceChannelData() {
 	for data := range r.persistenceChannel {
 		err := persistence(data, r.persistenceFilePath)
 		if err != nil {
-			r.logger.Warning(err.Error())
+			r.logger.Error(err.Error())
+			go r.logClient.Report(Log_Error, err.Error())
 		}
 	}
 }
@@ -492,12 +510,14 @@ func (r *RegisterCenter) post(conn net.Conn, title PostTitle, data interface{}, 
 	bytes, err := json.Marshal(&datagram)
 	if err != nil {
 		r.logger.Error(err.Error())
+		go r.logClient.Report(Log_Error, err.Error())
 	}
 	_, err = conn.Write(bytes)
 	if err != nil {
 		r.ServiceActive[serviceId] = Stop
 		conn.Close()
 		r.logger.Error(err.Error())
+		go r.logClient.Report(Log_Error, err.Error())
 	}
 }
 

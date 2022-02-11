@@ -31,6 +31,12 @@ const (
 )
 
 const (
+	Log_Info  = "Info"
+	Log_Warn  = "Warn"
+	Log_Error = "Error"
+)
+
+const (
 	NO_SUBSCRIBE_INFO            = "NO_SUBSCRIBE_INFO"
 	KEY_NOT_EXIST                = "KEY_NOT_EXIST"
 	DATA_LOCKED                  = "DATA_LOCKED"
@@ -64,6 +70,7 @@ type RegisterCenter struct {
 
 	webSocketServer *socketio.Server //websocket服务
 	logger          *logrus.Logger   //日志管理
+	logClient       *LogClient
 
 	linkPool    map[string]LinkInfo
 	socketPool  map[int64]net.Conn //TCP连接池
@@ -73,6 +80,23 @@ type RegisterCenter struct {
 	persistenceChannel chan FileStorage   //数据更新通道
 	updateChannel      chan UpdatePackage //数据更新通道
 	rLocker            map[int64]bool     //读数据锁
+}
+
+type LogClient struct {
+	SqlClient   *xorm.Engine
+	ServiceId   int64
+	ServiceName string
+}
+
+type Log struct {
+	Id          int64     `json:"id"`
+	ServiceId   int64     `json:"service_id"`
+	ServiceName string    `json:"service_name"`
+	Level       string    `json:"level"`
+	File        string    `json:"file"`
+	Line        int       `json:"line"`
+	Message     string    `json:"message"`
+	Time        time.Time `json:"time"`
 }
 
 type MicroService struct {
