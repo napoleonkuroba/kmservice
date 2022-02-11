@@ -2,6 +2,7 @@ package peer
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/go-xorm/xorm"
 	"github.com/hducqa/kmservice/core"
 	"github.com/sirupsen/logrus"
@@ -46,7 +47,7 @@ func NewPeer(config PeerConfig, sql *xorm.Engine, logSql *xorm.Engine, logger *l
 		token:             config.Token,
 		ServiceId:         config.ServiceId,
 		ServiceName:       config.ServiceName,
-		PeerData:          make(map[int64]interface{}),
+		peerData:          make(map[int64]interface{}),
 		getList:           make(map[int64]bool),
 		updateRequestList: make(map[int64]int),
 		subscribeKeys:     make(map[string]int64),
@@ -99,7 +100,7 @@ func (p *Peer) UpdateRequest(keyStr string, new interface{}) bool {
 		return false
 	}
 	update := core.UpdateRequset{
-		Origin: p.PeerData[key],
+		Origin: p.peerData[key],
 		New:    new,
 	}
 	p.post(core.DataGram{
@@ -191,6 +192,18 @@ func (p *Peer) GET(keys []string) error {
 		p.getList[keyId] = true
 	}
 	return nil
+}
+
+func (p *Peer) GetData(key string) (interface{}, error) {
+	keyId, ok := p.subscribeKeys[key]
+	if !ok {
+		return nil, errors.New("no subscribe found!")
+	}
+	value, ok := p.peerData[keyId]
+	if !ok {
+		return nil, errors.New("no data found!")
+	}
+	return value, nil
 }
 
 //

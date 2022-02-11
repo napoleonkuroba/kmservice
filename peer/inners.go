@@ -104,7 +104,7 @@ func (p *Peer) listen() {
 		case core.UPDATE:
 			{
 				go func() {
-					p.PeerData[data.Data.Key] = data.Data.Body
+					p.peerData[data.Data.Key] = data.Data.Body
 					p.getList[data.Data.Key] = false
 				}()
 				break

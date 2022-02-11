@@ -10,22 +10,6 @@ import (
 
 type LinkType int
 
-type CustomLinkKey int
-
-const (
-	_ CustomLinkKey = iota
-	Key1
-	Key2
-	Key3
-	Key4
-	Key5
-	Key6
-	Key7
-	Key8
-	Key9
-	Key10
-)
-
 const (
 	_ LinkType = iota
 	STOP
@@ -43,7 +27,7 @@ type Peer struct {
 	ServiceId   int64
 	ServiceName string
 
-	PeerData          map[int64]interface{}
+	peerData          map[int64]interface{}
 	getList           map[int64]bool
 	updateRequestList map[int64]int //订阅更新申请状态，1为申请中，2为申请成功，-1为申请失败,0为可申请
 	subscribeKeys     map[string]int64
