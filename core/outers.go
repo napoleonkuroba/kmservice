@@ -433,6 +433,13 @@ func (r RegisterCenter) GetServicePrivileges(subscriber int64) map[int64]Subscri
 	return result
 }
 
+//
+//  Report
+//  @Description: 上传运行日志
+//  @receiver l
+//  @param level
+//  @param message
+//
 func (l *LogClient) Report(level string, message string) {
 	_, file, line, _ := runtime.Caller(1)
 	log := Log{
@@ -445,4 +452,20 @@ func (l *LogClient) Report(level string, message string) {
 		Time:        time.Now(),
 	}
 	l.SqlClient.Insert(&log)
+}
+
+//
+//  GetLogs
+//  @Description: 获取所有的错误日志
+//  @receiver l
+//  @return []Log
+//  @return error
+//
+func (l *LogClient) GetLogs() ([]Log, error) {
+	logs := make([]Log, 0)
+	err := l.SqlClient.Find(&logs)
+	if err != nil {
+		return nil, err
+	}
+	return logs, nil
 }
