@@ -70,7 +70,7 @@ type RegisterCenter struct {
 
 	webSocketServer *socketio.Server //websocket服务
 	logger          *logrus.Logger   //日志管理
-	logClient       *LogClient
+	LogClient       *LogClient
 
 	linkPool    map[string]LinkInfo
 	socketPool  map[int64]net.Conn //TCP连接池

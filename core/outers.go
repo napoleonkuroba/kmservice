@@ -65,7 +65,7 @@ func NewCenter(sql *xorm.Engine, logSql *xorm.Engine, persistencePath string, lo
 		ServiceActive:       make(map[int64]ServiceState),
 		webSocketServer:     socketio.NewServer(nil),
 		logger:              logger,
-		logClient:           &logClient,
+		LogClient:           &logClient,
 		linkPool:            make(map[string]LinkInfo),
 		socketPool:          make(map[int64]net.Conn),
 		connNum:             0,
@@ -115,7 +115,7 @@ func (r *RegisterCenter) Run(port string) {
 		conn, err := listen.Accept()
 		if err != nil {
 			r.logger.Error(err.Error())
-			go r.logClient.Report(Log_Error, err.Error())
+			go r.LogClient.Report(Log_Error, err.Error())
 		}
 		go r.socketHandle(conn)
 	}
@@ -235,7 +235,7 @@ func (r *RegisterCenter) DeleteService(id int64) error {
 			_, err = r.sqlClient.Where("Id=?", subscribe.Id).Update(&subscribe)
 			if err != nil {
 				r.logger.Error(err.Error())
-				go r.logClient.Report(Log_Error, err.Error())
+				go r.LogClient.Report(Log_Error, err.Error())
 			}
 		}
 	}
