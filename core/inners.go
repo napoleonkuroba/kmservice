@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -288,10 +289,16 @@ func (r *RegisterCenter) handleLink(conn net.Conn, datagram DataGram) {
 		return
 	}
 	token := createToken(apply.Key)
+	linkIp := ""
 	ip := conn.RemoteAddr()
+	ipStr := ip.String()
+	ipParts := strings.Split(ipStr, ":")
+	if len(ipParts) > 0 {
+		linkIp = ipParts[0]
+	}
 	linkInfo := LinkInfo{
 		Key:   apply.Key,
-		Host:  ip.String(),
+		Host:  linkIp,
 		Port:  apply.Port,
 		Token: token,
 	}

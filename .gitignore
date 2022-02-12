@@ -12,6 +12,8 @@
 # production
 /build
 
+*.drawio
+
 # misc
 .DS_Store
 .env.local

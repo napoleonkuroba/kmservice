@@ -77,7 +77,7 @@ type RegisterCenter struct {
 	connNum     int                //当前维护连接数
 	maxPoolSize int                //最大连接数量
 
-	persistenceChannel chan FileStorage   //数据更新通道
+	persistenceChannel chan FileStorage   //数据存储通道
 	updateChannel      chan UpdatePackage //数据更新通道
 	rLocker            map[int64]bool     //读数据锁
 }
