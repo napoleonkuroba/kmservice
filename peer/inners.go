@@ -86,6 +86,11 @@ func (p *Peer) listen() {
 			p.errorTimes--
 			continue
 		}
+		if data.Data.Title == core.CONFIRM {
+			tag := data.Data.Body.(string)
+			delete(p.pendingList, tag)
+			continue
+		}
 		p.post(core.DataGram{
 			Tag:       p.createTag(core.CONFIRM),
 			CenterTag: data.CenterTag,
@@ -119,12 +124,6 @@ func (p *Peer) listen() {
 		case core.SUCCESS:
 			{
 				p.updateRequestList[data.Data.Key] = 2
-				break
-			}
-		case core.CONFIRM:
-			{
-				tag := data.Data.Body.(string)
-				delete(p.pendingList, tag)
 				break
 			}
 		case core.LINK_SUBMIT:

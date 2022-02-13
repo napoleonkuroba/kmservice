@@ -213,8 +213,13 @@ func (r *RegisterCenter) connectionListen(conn net.Conn, id int64) {
 			go r.LogClient.Report(Log_Error, err.Error())
 			return
 		}
-		go r.post(conn, CONFIRM, datagram.Tag, DefaultTag, DefaultInt, DefaultInt, false)
-		go r.handle(conn, datagram, id)
+		if datagram.Data.Title == CONFIRM {
+			delete(r.pendingList, datagram.CenterTag)
+			continue
+		} else {
+			go r.post(conn, CONFIRM, datagram.Tag, DefaultTag, DefaultInt, DefaultInt, false)
+			go r.handle(conn, datagram, id)
+		}
 	}
 }
 
@@ -247,9 +252,6 @@ func (r *RegisterCenter) handle(conn net.Conn, datagram DataGram, id int64) {
 		return
 	case FIND_LINK:
 		r.handleFindLink(conn, datagram)
-		return
-	case CONFIRM:
-		delete(r.pendingList, datagram.CenterTag)
 		return
 	case GET_SUBSCRIBES:
 		subscribeMap := make(map[string]int64)
