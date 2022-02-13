@@ -168,6 +168,11 @@ func (r *RegisterCenter) socketHandle(conn net.Conn) {
 		r.connNum++
 		r.readChannel[service.Id] = make(chan byte, 20000)
 		r.gramChannel[service.Id] = make(chan DataGram, 2000)
+		subscribeMap := make(map[string]int64)
+		for _, subscribe := range r.Subscribes {
+			subscribeMap[subscribe.Key] = subscribe.Id
+		}
+		r.post(conn, SUBSCRIBES, subscribeMap, DefaultTag, DefaultInt, DefaultInt, true)
 		go r.listen(service.Id)
 		go r.unpacking(service.Id)
 		go r.handle(service.Id)

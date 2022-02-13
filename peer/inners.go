@@ -338,7 +338,6 @@ func (p *Peer) post(data core.DataGram) error {
 			Message:     data,
 		}
 	}
-	p.logger.Info("push data : ", storage)
 	return nil
 }
 
