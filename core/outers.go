@@ -302,7 +302,7 @@ func (r *RegisterCenter) Subscribe(subscriber int64, id int64) error {
 	r.loadSubscribes()
 	_, ok = r.socketPool[subscriber]
 	if ok {
-		r.post(r.socketPool[subscriber], UPDATE, r.DataMap[id], DefaultTag, DefaultInt, id)
+		r.post(r.socketPool[subscriber], UPDATE, r.DataMap[id], DefaultTag, DefaultInt, id, true)
 	}
 	return nil
 }
