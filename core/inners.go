@@ -170,7 +170,10 @@ func (r *RegisterCenter) socketHandle(conn net.Conn) {
 		for _, subscribe := range r.Subscribes {
 			subscribeMap[subscribe.Key] = subscribe.Id
 		}
-		r.post(conn, SUBSCRIBES, subscribeMap, DefaultTag, DefaultInt, DefaultInt)
+		go func() {
+			time.Sleep(2 * time.Second)
+			r.post(conn, SUBSCRIBES, subscribeMap, DefaultTag, DefaultInt, DefaultInt)
+		}()
 		go r.connectionListen(conn, service.Id)
 		return
 	}
@@ -244,6 +247,13 @@ func (r *RegisterCenter) handle(conn net.Conn, datagram DataGram, id int64) {
 		return
 	case FIND_LINK:
 		r.handleFindLink(conn, datagram)
+		return
+	case GET_SUBSCRIBES:
+		subscribeMap := make(map[string]int64)
+		for _, subscribe := range r.Subscribes {
+			subscribeMap[subscribe.Key] = subscribe.Id
+		}
+		r.post(conn, SUBSCRIBES, subscribeMap, DefaultTag, DefaultInt, DefaultInt)
 		return
 	}
 	r.post(conn, EXCEPTION, REQUEST_TYPE_EXCEPTION, datagram.Tag, datagram.ServiceId, DefaultInt)

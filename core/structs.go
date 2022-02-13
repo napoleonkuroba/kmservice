@@ -28,6 +28,7 @@ const (
 	FIND_LINK
 	SUBSCRIBES
 	LINK_SUBMIT
+	GET_SUBSCRIBES
 )
 
 const (
