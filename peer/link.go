@@ -79,6 +79,7 @@ func (l *Link) linkListen(port string) {
 	if err != nil {
 		l.logger.Error(err.Error())
 		go l.logClient.Report(core.Log_Error, err.Error())
+		return
 	}
 	l.logger.Info("TCP listening on port :" + port)
 	for {
