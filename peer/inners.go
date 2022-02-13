@@ -61,6 +61,7 @@ func (p *Peer) listen() {
 		if p.connection == nil {
 			p.logger.Fatal("connection closed")
 			go p.LogClient.Report(core.Log_Error, "connection closed")
+			return
 		}
 		buff := make([]byte, 204800)
 		length, err := p.connection.Read(buff)
@@ -73,6 +74,7 @@ func (p *Peer) listen() {
 		for _, dataByte := range dataBytes {
 			p.readChannel <- dataByte
 		}
+		p.errorTimes = p.maxErrorTimes
 	}
 }
 
@@ -304,8 +306,6 @@ func (p *Peer) handleFindLink(data core.DataGram) {
 func (p *Peer) post(data core.DataGram) error {
 	bytes, err := data.Package()
 
-	p.logger.Info("post:", string(bytes))
-
 	if err != nil {
 		return err
 	}
@@ -313,6 +313,7 @@ func (p *Peer) post(data core.DataGram) error {
 		return errors.New("no conn found")
 	}
 	_, err = p.connection.Write(bytes)
+	p.logger.Info("post:", string(bytes))
 	if err != nil {
 		return err
 	}
@@ -354,7 +355,7 @@ func (p Peer) createTag(title core.PostTitle) string {
 		b := rand.Intn(26) + 65
 		bytes[i] = byte(b)
 	}
-	return string(bytes) + "-" + strconv.Itoa(int(p.ServiceId)) + "-" + strconv.Itoa(int(title))
+	return string(bytes) + "-" + strconv.Itoa(int(p.ServiceId)) + "-" + string(title)
 }
 
 //
@@ -371,7 +372,7 @@ func (p *Peer) dataGramLog(data core.DataGram) {
 	_, err := p.sqlClient.Get(&storage)
 	if err != nil {
 		p.logger.Error(err.Error(), " ", data.Tag, " ", data.Data.Title)
-		go p.LogClient.Report(core.Log_Error, err.Error()+" tag: "+data.Tag+" title: "+strconv.Itoa(int(data.Data.Title)))
+		go p.LogClient.Report(core.Log_Error, err.Error()+" tag: "+data.Tag+" title: "+string(data.Data.Title))
 	} else {
 		file, err := os.Open(p.filePath + data.Tag + strconv.Itoa(int(storage.ServiceId)))
 		defer file.Close()
@@ -391,7 +392,7 @@ func (p *Peer) dataGramLog(data core.DataGram) {
 			go p.LogClient.Report(core.Log_Error, err.Error())
 		}
 		p.logger.Error(data.Tag, " ", data.Data.Title, " ", dataBody)
-		go p.LogClient.Report(core.Log_Error, "tag"+data.Tag+" title: "+strconv.Itoa(int(data.Data.Title)))
+		go p.LogClient.Report(core.Log_Error, "tag"+data.Tag+" title: "+string(data.Data.Title))
 	}
 }
 

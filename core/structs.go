@@ -12,24 +12,23 @@ import (
 const DefaultTag = "Center"
 const DefaultInt = int64(0)
 
-type PostTitle int
+type PostTitle string
 
 const (
-	_ PostTitle = iota
-	GET
-	LINK
-	UPDATE
-	CONFIRM
-	SUCCESS
-	CONNECT
-	FAILURE
-	API_LIST
-	EXCEPTION
-	IS_ACTIVE
-	FIND_LINK
-	SUBSCRIBES
-	LINK_SUBMIT
-	GET_SUBSCRIBES
+	GET            = "GET"
+	LINK           = "LINK"
+	UPDATE         = "UPDATE"
+	CONFIRM        = "CONFIRM"
+	SUCCESS        = "SUCCESS"
+	CONNECT        = "CONNECT"
+	FAILURE        = "FAILURE"
+	API_LIST       = "API_LIST"
+	EXCEPTION      = "EXCEPTION"
+	IS_ACTIVE      = "IS_ACTIVE"
+	FIND_LINK      = "FIND_LINK"
+	SUBSCRIBES     = "SUBSCRIBES"
+	LINK_SUBMIT    = "LINK_SUBMIT"
+	GET_SUBSCRIBES = "GET_SUBSCRIBES"
 )
 
 const (

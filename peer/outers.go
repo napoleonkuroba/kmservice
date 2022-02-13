@@ -151,7 +151,6 @@ func (p *Peer) POST(postTitle core.PostTitle, key string, body interface{}) {
 			Body:      body,
 		},
 	}
-	p.logger.Info("post:", data)
 	p.post(data)
 }
 
@@ -190,6 +189,14 @@ func (p *Peer) GET(keys []string) error {
 	return nil
 }
 
+//
+//  GetData
+//  @Description: 通过订阅键获取数据
+//  @receiver p
+//  @param key
+//  @return interface{}
+//  @return error
+//
 func (p *Peer) GetData(key string) (interface{}, error) {
 	keyId, ok := p.subscribeKeys[key]
 	if !ok {

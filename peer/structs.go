@@ -8,16 +8,15 @@ import (
 	"time"
 )
 
-type LinkType int
+type LinkType string
 
 const (
-	_ LinkType = iota
-	STOP
-	START
-	CUSTOM
-	CONFIRM
-	SUCCESS
-	TRANSFER
+	STOP     = "STOP"
+	START    = "START"
+	CUSTOM   = "CUSTOM"
+	CONFIRM  = "CONFIRM"
+	SUCCESS  = "SUCCESS"
+	TRANSFER = "TRANSFER"
 )
 
 type Peer struct {

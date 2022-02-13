@@ -273,29 +273,29 @@ func (r *RegisterCenter) handle(id int64) {
 		//处理更新请求
 		case UPDATE:
 			r.handleUpdate(conn, datagram, id)
-			return
+			continue
 		case GET:
 			r.handleGet(conn, datagram, id)
-			return
+			continue
 		case IS_ACTIVE:
 			r.ServiceActive[datagram.ServiceId] = Active
-			return
+			continue
 		case API_LIST:
 			r.handleAPIlist(conn, datagram, id)
-			return
+			continue
 		case LINK:
 			r.handleLink(conn, datagram)
-			return
+			continue
 		case FIND_LINK:
 			r.handleFindLink(conn, datagram)
-			return
+			continue
 		case GET_SUBSCRIBES:
 			subscribeMap := make(map[string]int64)
 			for _, subscribe := range r.Subscribes {
 				subscribeMap[subscribe.Key] = subscribe.Id
 			}
 			r.post(conn, SUBSCRIBES, subscribeMap, DefaultTag, DefaultInt, DefaultInt, true)
-			return
+			continue
 		}
 		r.post(conn, EXCEPTION, REQUEST_TYPE_EXCEPTION, datagram.Tag, datagram.ServiceId, DefaultInt, true)
 	}
