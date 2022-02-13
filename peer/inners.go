@@ -65,10 +65,9 @@ func (p *Peer) listen() {
 		buff := make([]byte, 204800)
 		length, err := p.connection.Read(buff)
 		if err != nil {
-			p.logger.Error(err.Error())
+			p.logger.Fatal(err.Error())
 			go p.LogClient.Report(core.Log_Error, err.Error())
 			p.errorTimes--
-			continue
 		}
 		dataBytes := buff[:length]
 		for _, dataByte := range dataBytes {

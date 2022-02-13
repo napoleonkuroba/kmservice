@@ -263,12 +263,17 @@ func (l *LinkField) resend() {
 //
 func (l *LinkField) listen() {
 	for {
+		if l.conn == nil {
+			l.logger.Error("connection closed")
+			go l.logClient.Report(core.Log_Error, "connection closed")
+			return
+		}
 		buff := make([]byte, 2048)
 		length, err := l.conn.Read(buff)
 		if err != nil {
 			l.logger.Error(err.Error())
 			go l.logClient.Report(core.Log_Error, err.Error())
-			continue
+			return
 		}
 		datas := buff[:length]
 		for _, data := range datas {

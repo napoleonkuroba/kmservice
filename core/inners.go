@@ -168,7 +168,7 @@ func (r *RegisterCenter) socketHandle(conn net.Conn) {
 		r.connNum++
 		r.readChannel[service.Id] = make(chan byte, 20000)
 		r.gramChannel[service.Id] = make(chan DataGram, 2000)
-		go r.connectionListen(service.Id)
+		go r.listen(service.Id)
 		go r.unpacking(service.Id)
 		go r.handle(service.Id)
 		return
@@ -216,13 +216,12 @@ func (r *RegisterCenter) unpacking(id int64) {
 }
 
 //
-//  connectionListen
+//  listen
 //  @Description: 监听微服务发送的请求
 //  @receiver r
-//  @param conn 连接对象
 //  @param id	服务id
 //
-func (r *RegisterCenter) connectionListen(id int64) {
+func (r *RegisterCenter) listen(id int64) {
 	for key, value := range r.Subscribes {
 		for _, subscriber := range value.Subscribers {
 			if id == subscriber {
@@ -242,7 +241,7 @@ func (r *RegisterCenter) connectionListen(id int64) {
 		if err != nil {
 			r.logger.Error(err.Error())
 			go r.LogClient.Report(Log_Error, err.Error())
-			continue
+			return
 		}
 		dataBytes := buff[:length]
 		for _, dataByte := range dataBytes {
@@ -255,8 +254,6 @@ func (r *RegisterCenter) connectionListen(id int64) {
 //  handle
 //  @Description: 处理微服务发送的请求
 //  @receiver r
-//  @param conn	连接对象
-//  @param datagram	数据报
 //  @param id	服务id
 //
 func (r *RegisterCenter) handle(id int64) {
