@@ -81,6 +81,15 @@ type RegisterCenter struct {
 	persistenceChannel chan FileStorage   //数据存储通道
 	updateChannel      chan UpdatePackage //数据更新通道
 	rLocker            map[int64]bool     //读数据锁
+
+	pendingList map[string]PendingItem
+}
+
+type PendingItem struct {
+	Time        time.Time
+	ResendTimes int
+	Message     DataGram
+	Conn        net.Conn
 }
 
 type LogClient struct {
@@ -135,6 +144,7 @@ type ConnApply struct {
 
 type DataGram struct {
 	Tag       string
+	CenterTag string
 	ServiceId int64
 	Data      Data
 }

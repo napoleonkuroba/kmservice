@@ -86,6 +86,15 @@ func (p *Peer) listen() {
 			p.errorTimes--
 			continue
 		}
+		p.post(core.DataGram{
+			Tag:       p.createTag(core.CONFIRM),
+			CenterTag: data.CenterTag,
+			ServiceId: p.ServiceId,
+			Data: core.Data{
+				Title:     core.CONFIRM,
+				TimeStamp: time.Now(),
+			},
+		})
 		p.logger.Info("received : ", data)
 		p.errorTimes = p.maxErrorTimes
 		switch data.Data.Title {
@@ -276,7 +285,8 @@ func (p *Peer) post(data core.DataGram) error {
 		Tag:       data.Tag,
 		PostType:  data.Data.Title,
 	}
-	if data.Data.Title != core.IS_ACTIVE {
+
+	if data.Data.Title != core.IS_ACTIVE && data.Data.Title != core.CONFIRM {
 		go func() {
 			p.sqlClient.Insert(&storage)
 			fileBytes, _ := json.Marshal(data)
@@ -286,10 +296,12 @@ func (p *Peer) post(data core.DataGram) error {
 			_, err = f.WriteAt(fileBytes, n)
 		}()
 	}
-	p.pendingList[data.Tag] = PendingGram{
-		Time:        time.Now(),
-		ResendTimes: 0,
-		Message:     data,
+	if data.Data.Title != core.CONFIRM {
+		p.pendingList[data.Tag] = PendingGram{
+			Time:        time.Now(),
+			ResendTimes: 0,
+			Message:     data,
+		}
 	}
 	p.logger.Info("push data : ", storage)
 	return nil
@@ -390,8 +402,8 @@ func (p *Peer) resend() {
 				delete(p.pendingList, key)
 				continue
 			}
-			subTime := time.Now().Sub(item.Time).Minutes()
-			if subTime > 5 {
+			subTime := time.Now().Sub(item.Time).Seconds()
+			if subTime > 30 {
 				bytes, _ := json.Marshal(item.Message)
 				p.connection.Write(bytes)
 			}

@@ -248,6 +248,9 @@ func (r *RegisterCenter) handle(conn net.Conn, datagram DataGram, id int64) {
 	case FIND_LINK:
 		r.handleFindLink(conn, datagram)
 		return
+	case CONFIRM:
+		delete(r.pendingList, datagram.CenterTag)
+		return
 	case GET_SUBSCRIBES:
 		subscribeMap := make(map[string]int64)
 		for _, subscribe := range r.Subscribes {
@@ -513,8 +516,10 @@ func (r *RegisterCenter) timingStatusCheck() {
 //  @param key	数据报关键字
 //
 func (r *RegisterCenter) post(conn net.Conn, title PostTitle, data interface{}, tag string, serviceId int64, key int64) {
+	centerTag := createToken(time.Now().Format("2006-01-02-15:04:05"))
 	datagram := DataGram{
 		Tag:       tag,
+		CenterTag: centerTag,
 		ServiceId: serviceId,
 		Data: Data{
 			Title:     title,
@@ -541,6 +546,47 @@ func (r *RegisterCenter) post(conn net.Conn, title PostTitle, data interface{}, 
 		conn.Close()
 		r.logger.Error(err.Error())
 		go r.LogClient.Report(Log_Error, err.Error())
+	}
+	if title != CONFIRM {
+		r.pendingList[centerTag] = PendingItem{
+			Time:        time.Now(),
+			ResendTimes: 0,
+			Message:     datagram,
+			Conn:        conn,
+		}
+	}
+}
+
+//
+//  resend
+//  @Description: 重发机制
+//  @receiver r
+//
+func (r *RegisterCenter) resend() {
+	for {
+		time.Sleep(30 * time.Second)
+		for key, item := range r.pendingList {
+			if item.ResendTimes > 10 {
+				r.logger.Error("the datagram has sent to many times : ", item.Message)
+				bytes, _ := json.Marshal(item.Message)
+				go r.LogClient.Report(Log_Error, "the datagram has sent to many times : "+string(bytes))
+				delete(r.pendingList, key)
+				continue
+			}
+			subTime := time.Now().Sub(item.Time).Seconds()
+			if subTime > 30 {
+				bytes, _ := json.Marshal(item.Message)
+				if item.Conn == nil {
+					r.logger.Error("conn closed : ", item.Message)
+					go r.LogClient.Report(Log_Error, "conn closed  : "+string(bytes))
+					delete(r.pendingList, key)
+					continue
+				}
+				item.Conn.Write(bytes)
+			}
+			item.Time = time.Now()
+			item.ResendTimes++
+		}
 	}
 }
 

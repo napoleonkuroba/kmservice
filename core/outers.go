@@ -73,6 +73,7 @@ func NewCenter(sql *xorm.Engine, logSql *xorm.Engine, persistencePath string, lo
 		persistenceChannel:  make(chan FileStorage, 1000),
 		updateChannel:       make(chan UpdatePackage, 1000),
 		rLocker:             make(map[int64]bool),
+		pendingList:         make(map[string]PendingItem),
 	}
 
 	err = sql.Sync2(new(MicroService), new(Subscribe))
@@ -99,6 +100,7 @@ func (r *RegisterCenter) Run(port string) {
 	go r.persistenceChannelData()
 	go r.timingStatusCheck()
 	go r.recovery()
+	go r.resend()
 
 	listen, err := net.Listen("tcp", ":"+port)
 	if err != nil {
