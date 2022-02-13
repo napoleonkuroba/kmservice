@@ -96,8 +96,9 @@ func NewCenter(sql *xorm.Engine, logSql *xorm.Engine, persistencePath string, lo
 //  @param port	监听端口
 //
 func (r *RegisterCenter) Run(port string) {
-	go r.loadSubscribes()
-	go r.loadServices()
+	r.loadSubscribes()
+	r.logger.Info(r.Subscribes)
+	r.loadServices()
 	go r.subscribeUpdate()
 	go r.persistenceChannelData()
 	go r.timingStatusCheck()
