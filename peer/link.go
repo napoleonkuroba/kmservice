@@ -107,6 +107,10 @@ func (l *LinkField) post(data LinkGram) {
 		go l.logClient.Report(core.Log_Error, err.Error())
 		return
 	}
+	if l.conn == nil {
+		l.logger.Error("no conn found")
+		go l.logClient.Report(core.Log_Error, "no conn found")
+	}
 	_, err = l.conn.Write(bytes)
 	if err != nil {
 		l.logger.Error(err.Error())

@@ -264,6 +264,10 @@ func (p *Peer) post(data core.DataGram) error {
 	if err != nil {
 		return err
 	}
+	if p.connection == nil {
+		p.logger.Error("no conn found")
+		go p.LogClient.Report(core.Log_Error, "no conn found")
+	}
 	_, err = p.connection.Write(bytes)
 	if err != nil {
 		return err
