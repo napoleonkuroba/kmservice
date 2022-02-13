@@ -19,10 +19,12 @@ import (
 //  @receiver p
 //  @return error
 //
-func (p *Peer) connect() error {
+func (p *Peer) connect() {
+	p.readChannel = make(chan byte, 20000)
+	p.gramChannel = make(chan core.DataGram, 2000)
 	conn, err := net.Dial("tcp", p.centerIP+":"+p.centerPort)
 	if err != nil {
-		return err
+		p.logger.Fatal(err.Error())
 	}
 
 	//发送服务连接请求
@@ -32,31 +34,16 @@ func (p *Peer) connect() error {
 	}
 	bytes, err := json.Marshal(connectApply)
 	if err != nil {
-		return err
+		p.logger.Fatal(err.Error())
 	}
 	_, err = conn.Write(bytes)
 	if err != nil {
-		return err
+		p.logger.Fatal(err.Error())
 	}
-
-	//接收服务器响应
-	buff := make([]byte, 1024)
-	length, err := conn.Read(buff)
-	if err != nil {
-		return err
-	}
-	var data core.DataGram
-	err = json.Unmarshal(buff[:length], &data)
-	if err != nil {
-		p.logger.Error(string(buff))
-		p.logger.Error(string(buff[:length]))
-		return err
-	}
-	if data.Data.Title == core.CONNECT {
-		p.connection = conn
-		return nil
-	}
-	return errors.New(data.Data.Body.(string))
+	p.connection = conn
+	go p.unpacking()
+	go p.handle()
+	p.listen()
 }
 
 //
@@ -65,14 +52,17 @@ func (p *Peer) connect() error {
 //  @receiver p
 //
 func (p *Peer) listen() {
-	fmt.Println("Successfully connected to the center ")
 	for {
 		if p.errorTimes == 0 {
 			p.logger.Error("stopped for getting error too many times")
 			go p.LogClient.Report(core.Log_Error, "stopped for getting error too many times")
 			return
 		}
-		buff := make([]byte, 1048576)
+		if p.connection == nil {
+			p.logger.Fatal("connection closed")
+			go p.LogClient.Report(core.Log_Error, "connection closed")
+		}
+		buff := make([]byte, 204800)
 		length, err := p.connection.Read(buff)
 		if err != nil {
 			p.logger.Error(err.Error())
@@ -80,32 +70,64 @@ func (p *Peer) listen() {
 			p.errorTimes--
 			continue
 		}
-		var data core.DataGram
-		err = json.Unmarshal(buff[:length], &data)
-		if err != nil {
-			p.logger.Error(string(buff))
-			p.logger.Error(string(buff[:length]))
-			p.logger.Error(err.Error())
-			go p.LogClient.Report(core.Log_Error, err.Error())
-			p.errorTimes--
-			continue
+		dataBytes := buff[:length]
+		for _, dataByte := range dataBytes {
+			p.readChannel <- dataByte
 		}
-		if data.Data.Title == core.CONFIRM {
-			tag := data.Data.Body.(string)
-			delete(p.pendingList, tag)
-			continue
+	}
+}
+
+//
+//  unpacking
+//  @Description: 解析接收到的数据报
+//  @receiver p
+//
+func (p *Peer) unpacking() {
+	start := false
+	parseBytes := make([]byte, 0)
+	tags := []byte("&")
+	for dataByte := range p.readChannel {
+		if dataByte == tags[0] {
+			if start {
+				start = false
+				parseBytes = append(parseBytes, dataByte)
+				dataGram, err := core.UnPackage(parseBytes)
+				if err != nil {
+					p.logger.Error(err.Error())
+					go p.LogClient.Report(core.Log_Error, err.Error())
+				} else {
+					if dataGram.Data.Title == core.CONFIRM {
+						delete(p.pendingList, dataGram.CenterTag)
+					} else {
+						p.post(core.DataGram{
+							Tag:       p.createTag(core.CONFIRM),
+							CenterTag: dataGram.CenterTag,
+							ServiceId: p.ServiceId,
+							Data: core.Data{
+								Title:     core.CONFIRM,
+								TimeStamp: time.Now(),
+							},
+						})
+						p.gramChannel <- dataGram
+					}
+				}
+				parseBytes = make([]byte, 0)
+				continue
+			} else {
+				start = true
+			}
 		}
-		p.post(core.DataGram{
-			Tag:       p.createTag(core.CONFIRM),
-			CenterTag: data.CenterTag,
-			ServiceId: p.ServiceId,
-			Data: core.Data{
-				Title:     core.CONFIRM,
-				TimeStamp: time.Now(),
-			},
-		})
-		p.logger.Info("received : ", data)
-		p.errorTimes = p.maxErrorTimes
+		parseBytes = append(parseBytes, dataByte)
+	}
+}
+
+//
+//  handle
+//  @Description: 处理收到的请求
+//  @receiver p
+//
+func (p *Peer) handle() {
+	for data := range p.gramChannel {
 		switch data.Data.Title {
 		case core.IS_ACTIVE:
 			{
@@ -139,6 +161,15 @@ func (p *Peer) listen() {
 			{
 				p.handleFindLink(data)
 				break
+			}
+		case core.CONNECT:
+			{
+				fmt.Println("Successfully connected to the center ")
+				break
+			}
+		case core.EXCEPTION:
+			{
+				p.handleException(data)
 			}
 		case core.SUBSCRIBES:
 			{
@@ -272,7 +303,7 @@ func (p *Peer) handleFindLink(data core.DataGram) {
 //  @return error
 //
 func (p *Peer) post(data core.DataGram) error {
-	bytes, err := json.Marshal(data)
+	bytes, err := data.Package()
 	if err != nil {
 		return err
 	}
@@ -288,7 +319,6 @@ func (p *Peer) post(data core.DataGram) error {
 		Tag:       data.Tag,
 		PostType:  data.Data.Title,
 	}
-
 	if data.Data.Title != core.IS_ACTIVE && data.Data.Title != core.CONFIRM {
 		go func() {
 			p.sqlClient.Insert(&storage)
@@ -407,7 +437,14 @@ func (p *Peer) resend() {
 			}
 			subTime := time.Now().Sub(item.Time).Minutes()
 			if subTime > 1 {
-				bytes, _ := json.Marshal(item.Message)
+				bytes, err := item.Message.Package()
+				if err != nil {
+					p.logger.Error(err.Error())
+					go p.LogClient.Report(core.Log_Error, err.Error())
+					item.Time = time.Now()
+					item.ResendTimes++
+					continue
+				}
 				p.connection.Write(bytes)
 			}
 			item.Time = time.Now()

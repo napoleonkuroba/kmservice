@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -124,7 +125,7 @@ func (r *RegisterCenter) displaySubscribes() {
 //  @param conn	连接对象
 //
 func (r *RegisterCenter) socketHandle(conn net.Conn) {
-	buff := make([]byte, 20480)
+	buff := make([]byte, 2048)
 	length, err := conn.Read(buff)
 	if err != nil {
 		r.logger.Error(err.Error())
@@ -140,7 +141,6 @@ func (r *RegisterCenter) socketHandle(conn net.Conn) {
 		conn.Close()
 		return
 	}
-
 	//从数据库中获取服务的注册信息
 	service := MicroService{Id: apply.Id}
 	exist, err := r.sqlClient.Get(&service)
@@ -166,20 +166,53 @@ func (r *RegisterCenter) socketHandle(conn net.Conn) {
 		r.socketPool[service.Id] = conn
 		r.ServiceActive[service.Id] = Active
 		r.connNum++
-		subscribeMap := make(map[string]int64)
-		for _, subscribe := range r.Subscribes {
-			subscribeMap[subscribe.Key] = subscribe.Id
-		}
-		go func() {
-			time.Sleep(2 * time.Second)
-			r.post(conn, SUBSCRIBES, subscribeMap, DefaultTag, DefaultInt, DefaultInt, true)
-		}()
-		go r.connectionListen(conn, service.Id)
+		r.readChannel[service.Id] = make(chan byte, 20000)
+		r.gramChannel[service.Id] = make(chan DataGram, 2000)
+		go r.connectionListen(service.Id)
+		go r.unpacking(service.Id)
+		go r.handle(service.Id)
 		return
 	}
 	r.post(conn, FAILURE, err.Error(), DefaultTag, DefaultInt, DefaultInt, false)
-	time.Sleep(2 * time.Second)
+	time.Sleep(1 * time.Second)
 	conn.Close()
+}
+
+//
+//  unpacking
+//  @Description: 解析通道内的字节数组获取数据报对象
+//  @receiver r
+//  @param id	服务id
+//
+func (r *RegisterCenter) unpacking(id int64) {
+	start := false
+	parseBytes := make([]byte, 0)
+	tags := []byte("&")
+	for dataByte := range r.readChannel[id] {
+		if dataByte == tags[0] {
+			if start {
+				start = false
+				parseBytes = append(parseBytes, dataByte)
+				dataGram, err := UnPackage(parseBytes)
+				if err != nil {
+					r.logger.Error(err.Error())
+					go r.LogClient.Report(Log_Error, err.Error())
+				} else {
+					if dataGram.Data.Title == CONFIRM {
+						delete(r.pendingList, dataGram.CenterTag)
+					} else {
+						r.post(r.socketPool[id], CONFIRM, dataGram.Tag, DefaultTag, DefaultInt, DefaultInt, false)
+						r.gramChannel[id] <- dataGram
+					}
+				}
+				parseBytes = make([]byte, 0)
+				continue
+			} else {
+				start = true
+			}
+		}
+		parseBytes = append(parseBytes, dataByte)
+	}
 }
 
 //
@@ -189,36 +222,31 @@ func (r *RegisterCenter) socketHandle(conn net.Conn) {
 //  @param conn 连接对象
 //  @param id	服务id
 //
-func (r *RegisterCenter) connectionListen(conn net.Conn, id int64) {
+func (r *RegisterCenter) connectionListen(id int64) {
 	for key, value := range r.Subscribes {
 		for _, subscriber := range value.Subscribers {
 			if id == subscriber {
-				r.post(conn, UPDATE, r.DataMap[key], DefaultTag, DefaultInt, key, true)
+				r.post(r.socketPool[id], UPDATE, r.DataMap[key], DefaultTag, DefaultInt, key, true)
 				break
 			}
 		}
 	}
 	for {
-		buff := make([]byte, 1048576)
-		length, err := conn.Read(buff)
+		buff := make([]byte, 204800)
+		if r.socketPool[id] == nil {
+			r.logger.Error("listen connection closed : id = ", strconv.Itoa(int(id)))
+			go r.LogClient.Report(Log_Error, " listen connection closed : id = "+strconv.Itoa(int(id)))
+			return
+		}
+		length, err := r.socketPool[id].Read(buff)
 		if err != nil {
 			r.logger.Error(err.Error())
 			go r.LogClient.Report(Log_Error, err.Error())
-			return
-		}
-		var datagram DataGram
-		err = json.Unmarshal(buff[:length], &datagram)
-		if err != nil {
-			r.logger.Error(err.Error())
-			go r.LogClient.Report(Log_Error, err.Error())
-			return
-		}
-		if datagram.Data.Title == CONFIRM {
-			delete(r.pendingList, datagram.CenterTag)
 			continue
-		} else {
-			go r.post(conn, CONFIRM, datagram.Tag, DefaultTag, DefaultInt, DefaultInt, false)
-			go r.handle(conn, datagram, id)
+		}
+		dataBytes := buff[:length]
+		for _, dataByte := range dataBytes {
+			r.readChannel[id] <- dataByte
 		}
 	}
 }
@@ -231,38 +259,44 @@ func (r *RegisterCenter) connectionListen(conn net.Conn, id int64) {
 //  @param datagram	数据报
 //  @param id	服务id
 //
-func (r *RegisterCenter) handle(conn net.Conn, datagram DataGram, id int64) {
-	r.logger.Info("recived ", datagram)
-	switch datagram.Data.Title {
-	//处理更新请求
-	case UPDATE:
-		r.handleUpdate(conn, datagram, id)
-		return
-	case GET:
-		r.handleGet(conn, datagram, id)
-		return
-	case IS_ACTIVE:
-		r.ServiceActive[datagram.ServiceId] = Active
-		return
-	case API_LIST:
-		r.handleAPIlist(conn, datagram, id)
-		return
-	case LINK:
-		r.handleLink(conn, datagram)
-		return
-	case FIND_LINK:
-		r.handleFindLink(conn, datagram)
-		return
-	case GET_SUBSCRIBES:
-		subscribeMap := make(map[string]int64)
-		for _, subscribe := range r.Subscribes {
-			subscribeMap[subscribe.Key] = subscribe.Id
+func (r *RegisterCenter) handle(id int64) {
+	for datagram := range r.gramChannel[id] {
+		r.logger.Info("recived ", datagram)
+		conn := r.socketPool[id]
+		if conn == nil {
+			r.logger.Error("handle connection closed : id = ", strconv.Itoa(int(id)))
+			go r.LogClient.Report(Log_Error, "handle connection closed : id = "+strconv.Itoa(int(id)))
 		}
-		r.post(conn, SUBSCRIBES, subscribeMap, DefaultTag, DefaultInt, DefaultInt, true)
-		return
+		switch datagram.Data.Title {
+		//处理更新请求
+		case UPDATE:
+			r.handleUpdate(conn, datagram, id)
+			return
+		case GET:
+			r.handleGet(conn, datagram, id)
+			return
+		case IS_ACTIVE:
+			r.ServiceActive[datagram.ServiceId] = Active
+			return
+		case API_LIST:
+			r.handleAPIlist(conn, datagram, id)
+			return
+		case LINK:
+			r.handleLink(conn, datagram)
+			return
+		case FIND_LINK:
+			r.handleFindLink(conn, datagram)
+			return
+		case GET_SUBSCRIBES:
+			subscribeMap := make(map[string]int64)
+			for _, subscribe := range r.Subscribes {
+				subscribeMap[subscribe.Key] = subscribe.Id
+			}
+			r.post(conn, SUBSCRIBES, subscribeMap, DefaultTag, DefaultInt, DefaultInt, true)
+			return
+		}
+		r.post(conn, EXCEPTION, REQUEST_TYPE_EXCEPTION, datagram.Tag, datagram.ServiceId, DefaultInt, true)
 	}
-	r.post(conn, EXCEPTION, REQUEST_TYPE_EXCEPTION, datagram.Tag, datagram.ServiceId, DefaultInt, true)
-	return
 }
 
 //region 处理请求
@@ -531,7 +565,7 @@ func (r *RegisterCenter) post(conn net.Conn, title PostTitle, data interface{}, 
 		},
 	}
 	r.logger.Info("send : ", datagram)
-	bytes, err := json.Marshal(&datagram)
+	bytes, err := datagram.Package()
 	if err != nil {
 		r.logger.Error(err.Error())
 		go r.LogClient.Report(Log_Error, err.Error())
@@ -570,14 +604,21 @@ func (r *RegisterCenter) resend() {
 		for key, item := range r.pendingList {
 			if item.ResendTimes > 10 {
 				r.logger.Error("the datagram has sent to many times : ", item.Message)
-				bytes, _ := json.Marshal(item.Message)
+				bytes, _ := item.Message.Package()
 				go r.LogClient.Report(Log_Error, "the datagram has sent to many times : "+string(bytes))
 				delete(r.pendingList, key)
 				continue
 			}
 			subTime := time.Now().Sub(item.Time).Minutes()
 			if subTime > 1 {
-				bytes, _ := json.Marshal(item.Message)
+				bytes, err := item.Message.Package()
+				if err != nil {
+					r.logger.Error(err.Error())
+					go r.LogClient.Report(Log_Error, err.Error())
+					item.Time = time.Now()
+					item.ResendTimes++
+					continue
+				}
 				if item.Conn == nil {
 					r.logger.Error("conn closed : ", item.Message)
 					go r.LogClient.Report(Log_Error, "conn closed  : "+string(bytes))

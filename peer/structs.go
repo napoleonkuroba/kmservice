@@ -46,6 +46,9 @@ type Peer struct {
 	connection    net.Conn
 	errorTimes    int
 	filePath      string
+
+	readChannel chan byte
+	gramChannel chan core.DataGram
 }
 
 type PeerConfig struct {
@@ -90,6 +93,9 @@ type LinkField struct {
 	pending       map[string]PendingLinkGram
 	logger        *logrus.Logger
 	logClient     *core.LogClient
+
+	readChannel chan byte
+	gramChannel chan LinkGram
 }
 
 type PendingLinkGram struct {

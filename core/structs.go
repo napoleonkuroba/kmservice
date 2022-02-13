@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/json"
 	"github.com/go-xorm/xorm"
 	socketio "github.com/googollee/go-socket.io"
 	"github.com/sirupsen/logrus"
@@ -62,6 +63,9 @@ const (
 )
 
 type RegisterCenter struct {
+	readChannel map[int64]chan byte
+	gramChannel map[int64]chan DataGram
+
 	persistenceFilePath string                 //持久化文件路径
 	DataMap             map[int64]interface{}  //共享文件库
 	Subscribes          map[int64]Subscribe    //订阅名单
@@ -147,6 +151,40 @@ type DataGram struct {
 	CenterTag string
 	ServiceId int64
 	Data      Data
+}
+
+//
+//  Package
+//  @Description: 数据报封装
+//  @receiver d
+//  @return []byte
+//  @return error
+//
+func (d DataGram) Package() ([]byte, error) {
+	result := make([]byte, 0)
+	bytes, err := json.Marshal(d)
+	if err != nil {
+		return nil, err
+	}
+	tag := []byte("&")
+	result = append(result, tag...)
+	result = append(result, bytes...)
+	result = append(result, tag...)
+	return result, nil
+}
+
+//
+//  UnPackage
+//  @Description: 数据报解封装
+//  @param bytes
+//  @return DataGram
+//  @return error
+//
+func UnPackage(bytes []byte) (DataGram, error) {
+	data := bytes[1 : len(bytes)-1]
+	var datagram DataGram
+	err := json.Unmarshal(data, &datagram)
+	return datagram, err
 }
 
 type UpdateRequset struct {

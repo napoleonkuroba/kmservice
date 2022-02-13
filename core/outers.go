@@ -57,6 +57,8 @@ func NewCenter(sql *xorm.Engine, logSql *xorm.Engine, persistencePath string, lo
 	}
 
 	center := RegisterCenter{
+		readChannel:         make(map[int64]chan byte),
+		gramChannel:         make(map[int64]chan DataGram),
 		persistenceFilePath: persistencePath,
 		DataMap:             make(map[int64]interface{}),
 		Subscribes:          make(map[int64]Subscribe),
@@ -119,7 +121,7 @@ func (r *RegisterCenter) Run(port string) {
 			r.logger.Error(err.Error())
 			go r.LogClient.Report(Log_Error, err.Error())
 		}
-		go r.socketHandle(conn)
+		r.socketHandle(conn)
 	}
 }
 

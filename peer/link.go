@@ -15,6 +15,40 @@ const MaxResendTimes = 10
 const ChannelScale = 1500
 
 //
+//  Package
+//  @Description: 数据报封装
+//  @receiver d
+//  @return []byte
+//  @return error
+//
+func (l LinkGram) Package() ([]byte, error) {
+	result := make([]byte, 0)
+	bytes, err := json.Marshal(l)
+	if err != nil {
+		return nil, err
+	}
+	tag := []byte("&")
+	result = append(result, tag...)
+	result = append(result, bytes...)
+	result = append(result, tag...)
+	return result, nil
+}
+
+//
+//  UnPackage
+//  @Description: 数据报解封装
+//  @param bytes
+//  @return DataGram
+//  @return error
+//
+func UnPackage(bytes []byte) (LinkGram, error) {
+	data := bytes[1 : len(bytes)-1]
+	var linkgram LinkGram
+	err := json.Unmarshal(data, &linkgram)
+	return linkgram, err
+}
+
+//
 //  CreateLink
 //  @Description: 创建link中心节点
 //  @param logger
@@ -87,6 +121,8 @@ func (l *Link) linkListen(port string) {
 			pending:       make(map[string]PendingLinkGram),
 			logger:        l.logger,
 			logClient:     l.logClient,
+			readChannel:   make(chan byte, 20000),
+			gramChannel:   make(chan LinkGram, 2000),
 		})
 		l.LinkNumber++
 	}
@@ -100,16 +136,16 @@ func (l *Link) linkListen(port string) {
 //  @param logger	日志输出
 //  @return error
 //
-func (l *LinkField) post(data LinkGram) {
-	bytes, err := json.Marshal(data)
+func (l *LinkField) post(data LinkGram, resend bool) {
+	bytes, err := data.Package()
 	if err != nil {
 		l.logger.Error(err.Error())
 		go l.logClient.Report(core.Log_Error, err.Error())
 		return
 	}
 	if l.conn == nil {
-		l.logger.Error("no conn found")
-		go l.logClient.Report(core.Log_Error, "no conn found")
+		l.logger.Error("no connection found")
+		go l.logClient.Report(core.Log_Error, "no connection found")
 		return
 	}
 	_, err = l.conn.Write(bytes)
@@ -118,12 +154,13 @@ func (l *LinkField) post(data LinkGram) {
 		go l.logClient.Report(core.Log_Error, err.Error())
 		return
 	}
-	l.pending[data.Tag] = PendingLinkGram{
-		linkGram:    data,
-		resendTimes: 0,
+	if resend {
+		l.pending[data.Tag] = PendingLinkGram{
+			linkGram:    data,
+			resendTimes: 0,
+		}
 	}
 	l.logger.Info("push data : ", data)
-
 	return
 }
 
@@ -145,13 +182,15 @@ func createTag() string {
 
 //
 //  AccelerateLink
-//  @Description: 数据单向传输，单向响应
+//  @Description:
 //  @receiver l
 //  @param logger
 //
 func (l *LinkField) AccelerateLink() {
-	go l.handleResponse()
-	go l.Resend()
+	go l.listen()
+	go l.unpacking()
+	go l.handle()
+	go l.resend()
 	for data := range l.DataChannel {
 		for {
 			if l.stop {
@@ -162,7 +201,7 @@ func (l *LinkField) AccelerateLink() {
 			Tag:  createTag(),
 			Type: TRANSFER,
 			Body: data,
-		})
+		}, true)
 	}
 }
 
@@ -175,13 +214,13 @@ func (l *LinkField) AccelerateLink() {
 //  @param data	传输数据
 //  @param logger
 //
-func (l *LinkField) POST(linkType LinkType, customKey string, data interface{}) {
+func (l *LinkField) POST(linkType LinkType, customKey string, data interface{}, resend bool) {
 	l.post(LinkGram{
 		Tag:       createTag(),
 		Type:      linkType,
 		CustomKey: customKey,
 		Body:      data,
-	})
+	}, resend)
 }
 
 //
@@ -190,20 +229,24 @@ func (l *LinkField) POST(linkType LinkType, customKey string, data interface{}) 
 //  @receiver l
 //  @param logger
 //
-func (l *LinkField) Resend() {
+func (l *LinkField) resend() {
 	for {
 		time.Sleep(1 * time.Minute)
 		for key, item := range l.pending {
 			if item.resendTimes > MaxResendTimes {
 				l.logger.Error("the datagram has sent to many times : ", item.linkGram)
-				bytes, _ := json.Marshal(item.linkGram)
+				bytes, _ := item.linkGram.Package()
 				go l.logClient.Report(core.Log_Error, "the datagram has sent to many times : "+string(bytes))
 				delete(l.pending, key)
 				continue
 			}
 			subTime := time.Now().Sub(item.Time).Minutes()
-			if subTime > 3 {
-				bytes, _ := json.Marshal(item.linkGram)
+			if subTime > 1 {
+				bytes, err := json.Marshal(item.linkGram)
+				if err != nil {
+					l.logger.Error(err.Error())
+					go l.logClient.Report(core.Log_Error, err.Error())
+				}
 				l.conn.Write(bytes)
 			}
 			item.Time = time.Now()
@@ -218,7 +261,7 @@ func (l *LinkField) Resend() {
 //  @receiver l
 //  @param logger
 //
-func (l *LinkField) handleResponse() {
+func (l *LinkField) listen() {
 	for {
 		buff := make([]byte, 2048)
 		length, err := l.conn.Read(buff)
@@ -227,19 +270,62 @@ func (l *LinkField) handleResponse() {
 			go l.logClient.Report(core.Log_Error, err.Error())
 			continue
 		}
-		var data LinkGram
-		err = json.Unmarshal(buff[:length], &data)
-		if err != nil {
-			l.logger.Error(err.Error())
-			go l.logClient.Report(core.Log_Error, err.Error())
-			continue
+		datas := buff[:length]
+		for _, data := range datas {
+			l.readChannel <- data
 		}
-		switch data.Type {
-		case CONFIRM:
-			{
-				delete(l.pending, data.Tag)
+	}
+}
+
+//
+//  unpacking
+//  @Description: 解析接收到的数据报
+//  @receiver p
+//
+func (l *LinkField) unpacking() {
+	start := false
+	parseBytes := make([]byte, 0)
+	tags := []byte("&")
+	for dataByte := range l.readChannel {
+		if dataByte == tags[0] {
+			if start {
+				start = false
+				parseBytes = append(parseBytes, dataByte)
+				linkGram, err := UnPackage(parseBytes)
+				if err != nil {
+					l.logger.Error(err.Error())
+					go l.logClient.Report(core.Log_Error, err.Error())
+				} else {
+					if linkGram.Type == CONFIRM {
+						delete(l.pending, linkGram.Tag)
+					} else {
+						l.post(LinkGram{
+							Tag:       linkGram.Tag,
+							Type:      CONFIRM,
+							CustomKey: linkGram.CustomKey,
+							Body:      nil,
+						}, false)
+						l.gramChannel <- linkGram
+					}
+				}
+				parseBytes = make([]byte, 0)
 				continue
+			} else {
+				start = true
 			}
+		}
+		parseBytes = append(parseBytes, dataByte)
+	}
+}
+
+//
+//  handle
+//  @Description: 处理link请求
+//  @receiver l
+//
+func (l *LinkField) handle() {
+	for data := range l.gramChannel {
+		switch data.Type {
 		case STOP:
 			{
 				l.stop = true
@@ -253,71 +339,34 @@ func (l *LinkField) handleResponse() {
 		case CUSTOM:
 			{
 				l.CustomChannel <- data
+				continue
+			}
+		case TRANSFER:
+			{
+				l.DataChannel <- data.Body
+				go func() {
+					for len(l.DataChannel) > ChannelScale {
+						if l.stop != true {
+							l.post(LinkGram{
+								Tag:  "",
+								Type: STOP,
+								Body: nil,
+							}, true)
+						}
+						l.stop = true
+						time.Sleep(5 * time.Second)
+					}
+					if l.stop == true {
+						l.stop = false
+						l.post(LinkGram{
+							Tag:  "",
+							Type: START,
+							Body: nil,
+						}, true)
+					}
+				}()
+				continue
 			}
 		}
-	}
-}
-
-//
-//  DataReciver
-//  @Description: 数据接收
-//  @receiver l
-//  @param logger
-//
-func (l *LinkField) DataReceiver() {
-	errorTimes := 10
-	for {
-		if errorTimes <= 0 {
-			l.logger.Error("too many errors!")
-			go l.logClient.Report(core.Log_Error, "too many errors!")
-			break
-		}
-		buff := make([]byte, 204800)
-		length, err := l.conn.Read(buff)
-		if err != nil {
-			l.logger.Error(err.Error())
-			go l.logClient.Report(core.Log_Error, err.Error())
-			errorTimes--
-			continue
-		}
-		var data LinkGram
-		err = json.Unmarshal(buff[:length], &data)
-		if err != nil {
-			l.logger.Error(err.Error())
-			go l.logClient.Report(core.Log_Error, err.Error())
-			errorTimes--
-			continue
-		}
-		l.post(LinkGram{
-			Tag:  data.Tag,
-			Type: CONFIRM,
-			Body: nil,
-		})
-		if data.Type == CUSTOM {
-			l.CustomChannel <- data
-		} else {
-			l.DataChannel <- data.Body
-		}
-		go func() {
-			for len(l.DataChannel) > ChannelScale {
-				if l.stop != true {
-					l.post(LinkGram{
-						Tag:  "",
-						Type: STOP,
-						Body: nil,
-					})
-				}
-				l.stop = true
-				time.Sleep(5 * time.Second)
-			}
-			if l.stop == true {
-				l.stop = false
-				l.post(LinkGram{
-					Tag:  "",
-					Type: START,
-					Body: nil,
-				})
-			}
-		}()
 	}
 }
