@@ -81,7 +81,6 @@ func (l *Link) linkListen(port string) {
 		go l.logClient.Report(core.Log_Error, err.Error())
 	}
 	l.logger.Info("TCP listening on port :" + port)
-	defer listen.Close()
 	for {
 		if l.LinkNumber > MaxLinkNumber {
 			time.Sleep(10 * time.Second)
