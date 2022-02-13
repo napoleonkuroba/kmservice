@@ -402,8 +402,8 @@ func (p *Peer) resend() {
 				delete(p.pendingList, key)
 				continue
 			}
-			subTime := time.Now().Sub(item.Time).Seconds()
-			if subTime > 30 {
+			subTime := time.Now().Sub(item.Time).Minutes()
+			if subTime > 1 {
 				bytes, _ := json.Marshal(item.Message)
 				p.connection.Write(bytes)
 			}

@@ -113,7 +113,7 @@ func (r *RegisterCenter) displaySubscribes() {
 		subscribeMap[subscribe.Key] = subscribe.Id
 	}
 	for _, conn := range r.socketPool {
-		r.post(conn, SUBSCRIBES, subscribeMap, DefaultTag, DefaultInt, DefaultInt)
+		r.post(conn, SUBSCRIBES, subscribeMap, DefaultTag, DefaultInt, DefaultInt, true)
 	}
 }
 
@@ -147,7 +147,7 @@ func (r *RegisterCenter) socketHandle(conn net.Conn) {
 	if err != nil {
 		r.logger.Error(err.Error())
 		go r.LogClient.Report(Log_Error, err.Error())
-		r.post(conn, FAILURE, err.Error(), DefaultTag, DefaultInt, DefaultInt)
+		r.post(conn, FAILURE, err.Error(), DefaultTag, DefaultInt, DefaultInt, false)
 		time.Sleep(2 * time.Second)
 		conn.Close()
 		return
@@ -156,13 +156,13 @@ func (r *RegisterCenter) socketHandle(conn net.Conn) {
 		address := conn.RemoteAddr()
 		r.logger.Warning(errors.New("fake connection from " + address.String()))
 		go r.LogClient.Report(Log_Error, "fake connection from "+address.String())
-		r.post(conn, FAILURE, err.Error(), DefaultTag, DefaultInt, DefaultInt)
+		r.post(conn, FAILURE, err.Error(), DefaultTag, DefaultInt, DefaultInt, false)
 		time.Sleep(2 * time.Second)
 		conn.Close()
 		return
 	}
 	if service.Token == apply.Token {
-		r.post(conn, CONNECT, nil, DefaultTag, DefaultInt, DefaultInt)
+		r.post(conn, CONNECT, nil, DefaultTag, DefaultInt, DefaultInt, true)
 		r.socketPool[service.Id] = conn
 		r.ServiceActive[service.Id] = Active
 		r.connNum++
@@ -172,12 +172,12 @@ func (r *RegisterCenter) socketHandle(conn net.Conn) {
 		}
 		go func() {
 			time.Sleep(2 * time.Second)
-			r.post(conn, SUBSCRIBES, subscribeMap, DefaultTag, DefaultInt, DefaultInt)
+			r.post(conn, SUBSCRIBES, subscribeMap, DefaultTag, DefaultInt, DefaultInt, true)
 		}()
 		go r.connectionListen(conn, service.Id)
 		return
 	}
-	r.post(conn, FAILURE, err.Error(), DefaultTag, DefaultInt, DefaultInt)
+	r.post(conn, FAILURE, err.Error(), DefaultTag, DefaultInt, DefaultInt, false)
 	time.Sleep(2 * time.Second)
 	conn.Close()
 }
@@ -193,7 +193,7 @@ func (r *RegisterCenter) connectionListen(conn net.Conn, id int64) {
 	for key, value := range r.Subscribes {
 		for _, subscriber := range value.Subscribers {
 			if id == subscriber {
-				r.post(conn, UPDATE, r.DataMap[key], DefaultTag, DefaultInt, key)
+				r.post(conn, UPDATE, r.DataMap[key], DefaultTag, DefaultInt, key, true)
 				break
 			}
 		}
@@ -213,7 +213,7 @@ func (r *RegisterCenter) connectionListen(conn net.Conn, id int64) {
 			go r.LogClient.Report(Log_Error, err.Error())
 			return
 		}
-		go r.post(conn, CONFIRM, datagram.Tag, DefaultTag, DefaultInt, DefaultInt)
+		go r.post(conn, CONFIRM, datagram.Tag, DefaultTag, DefaultInt, DefaultInt, false)
 		go r.handle(conn, datagram, id)
 	}
 }
@@ -256,10 +256,10 @@ func (r *RegisterCenter) handle(conn net.Conn, datagram DataGram, id int64) {
 		for _, subscribe := range r.Subscribes {
 			subscribeMap[subscribe.Key] = subscribe.Id
 		}
-		r.post(conn, SUBSCRIBES, subscribeMap, DefaultTag, DefaultInt, DefaultInt)
+		r.post(conn, SUBSCRIBES, subscribeMap, DefaultTag, DefaultInt, DefaultInt, true)
 		return
 	}
-	r.post(conn, EXCEPTION, REQUEST_TYPE_EXCEPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
+	r.post(conn, EXCEPTION, REQUEST_TYPE_EXCEPTION, datagram.Tag, datagram.ServiceId, DefaultInt, true)
 	return
 }
 
@@ -270,7 +270,7 @@ func (r RegisterCenter) handleFindLink(conn net.Conn, datagram DataGram) {
 	if err != nil {
 		r.logger.Error(err.Error())
 		go r.LogClient.Report(Log_Error, err.Error())
-		r.post(conn, EXCEPTION, FINDLINK_DATA_FORM_EXECPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
+		r.post(conn, EXCEPTION, FINDLINK_DATA_FORM_EXECPTION, datagram.Tag, datagram.ServiceId, DefaultInt, true)
 		return
 	}
 	var key string
@@ -278,27 +278,27 @@ func (r RegisterCenter) handleFindLink(conn net.Conn, datagram DataGram) {
 	if err != nil {
 		r.logger.Error(err.Error())
 		go r.LogClient.Report(Log_Error, err.Error())
-		r.post(conn, EXCEPTION, FINDLINK_DATA_FORM_EXECPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
+		r.post(conn, EXCEPTION, FINDLINK_DATA_FORM_EXECPTION, datagram.Tag, datagram.ServiceId, DefaultInt, true)
 		return
 	}
 	info, ok := r.linkPool[key]
 	if !ok {
-		r.post(conn, EXCEPTION, LINK_NOT_EXIST, datagram.Tag, datagram.ServiceId, DefaultInt)
+		r.post(conn, EXCEPTION, LINK_NOT_EXIST, datagram.Tag, datagram.ServiceId, DefaultInt, true)
 		return
 	}
-	r.post(conn, FIND_LINK, info, DefaultTag, DefaultInt, DefaultInt)
+	r.post(conn, FIND_LINK, info, DefaultTag, DefaultInt, DefaultInt, true)
 }
 
 func (r *RegisterCenter) handleLink(conn net.Conn, datagram DataGram) {
 	bytes, err := json.Marshal(datagram.Data.Body)
 	if err != nil {
-		r.post(conn, EXCEPTION, LINK_DATA_FORM_EXECPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
+		r.post(conn, EXCEPTION, LINK_DATA_FORM_EXECPTION, datagram.Tag, datagram.ServiceId, DefaultInt, true)
 		return
 	}
 	var apply LinkApply
 	err = json.Unmarshal(bytes, &apply)
 	if err != nil || apply.Port == "" || apply.Key == "" {
-		r.post(conn, EXCEPTION, LINK_DATA_FORM_EXECPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
+		r.post(conn, EXCEPTION, LINK_DATA_FORM_EXECPTION, datagram.Tag, datagram.ServiceId, DefaultInt, true)
 		return
 	}
 	token := createToken(apply.Key)
@@ -316,7 +316,7 @@ func (r *RegisterCenter) handleLink(conn net.Conn, datagram DataGram) {
 		Token: token,
 	}
 	r.linkPool[apply.Key] = linkInfo
-	r.post(conn, LINK_SUBMIT, linkInfo, DefaultTag, DefaultInt, DefaultInt)
+	r.post(conn, LINK_SUBMIT, linkInfo, DefaultTag, DefaultInt, DefaultInt, true)
 	return
 }
 
@@ -325,7 +325,7 @@ func (r *RegisterCenter) handleUpdate(conn net.Conn, datagram DataGram, id int64
 	if err != nil {
 		r.logger.Error(err.Error())
 		go r.LogClient.Report(Log_Error, err.Error())
-		r.post(conn, EXCEPTION, UPDATE_DATA_FORM_EXCEPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
+		r.post(conn, EXCEPTION, UPDATE_DATA_FORM_EXCEPTION, datagram.Tag, datagram.ServiceId, DefaultInt, true)
 		return
 	}
 	var data UpdateRequset
@@ -333,7 +333,7 @@ func (r *RegisterCenter) handleUpdate(conn net.Conn, datagram DataGram, id int64
 	if err != nil {
 		r.logger.Error(err.Error())
 		go r.LogClient.Report(Log_Error, err.Error())
-		r.post(conn, EXCEPTION, UPDATE_DATA_FORM_EXCEPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
+		r.post(conn, EXCEPTION, UPDATE_DATA_FORM_EXCEPTION, datagram.Tag, datagram.ServiceId, DefaultInt, true)
 		return
 	}
 	find := false
@@ -354,7 +354,7 @@ func (r *RegisterCenter) handleUpdate(conn net.Conn, datagram DataGram, id int64
 		}
 	}
 	if !find {
-		r.post(conn, EXCEPTION, WITHOUT_PERMISSION, datagram.Tag, datagram.ServiceId, DefaultInt)
+		r.post(conn, EXCEPTION, WITHOUT_PERMISSION, datagram.Tag, datagram.ServiceId, DefaultInt, true)
 	}
 	return
 }
@@ -364,7 +364,7 @@ func (r *RegisterCenter) handleGet(conn net.Conn, datagram DataGram, id int64) {
 	if err != nil {
 		r.logger.Error(err.Error())
 		go r.LogClient.Report(Log_Error, err.Error())
-		r.post(conn, EXCEPTION, GET_DATA_FORM_EXECPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
+		r.post(conn, EXCEPTION, GET_DATA_FORM_EXECPTION, datagram.Tag, datagram.ServiceId, DefaultInt, true)
 		return
 	}
 	keys := make([]int64, 0)
@@ -372,13 +372,13 @@ func (r *RegisterCenter) handleGet(conn net.Conn, datagram DataGram, id int64) {
 	if err != nil {
 		r.logger.Error(err.Error())
 		go r.LogClient.Report(Log_Error, err.Error())
-		r.post(conn, EXCEPTION, GET_DATA_FORM_EXECPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
+		r.post(conn, EXCEPTION, GET_DATA_FORM_EXECPTION, datagram.Tag, datagram.ServiceId, DefaultInt, true)
 		return
 	}
 	for _, key := range keys {
 		_, ok := r.DataMap[key]
 		if !ok {
-			r.post(conn, EXCEPTION, KEY_NOT_EXIST, datagram.Tag, datagram.ServiceId, DefaultInt)
+			r.post(conn, EXCEPTION, KEY_NOT_EXIST, datagram.Tag, datagram.ServiceId, DefaultInt, true)
 			continue
 		}
 		subscribers := r.Subscribes[key].Subscribers
@@ -386,16 +386,16 @@ func (r *RegisterCenter) handleGet(conn net.Conn, datagram DataGram, id int64) {
 		for _, subscriber := range subscribers {
 			if id == subscriber {
 				if r.rLocker[key] == false {
-					r.post(conn, UPDATE, r.DataMap[key], datagram.Tag, datagram.ServiceId, key)
+					r.post(conn, UPDATE, r.DataMap[key], datagram.Tag, datagram.ServiceId, key, true)
 				} else {
-					r.post(conn, EXCEPTION, DATA_LOCKED, datagram.Tag, datagram.ServiceId, key)
+					r.post(conn, EXCEPTION, DATA_LOCKED, datagram.Tag, datagram.ServiceId, key, true)
 				}
 				find = true
 				break
 			}
 		}
 		if !find {
-			r.post(conn, EXCEPTION, NO_SUBSCRIBE_INFO, datagram.Tag, datagram.ServiceId, key)
+			r.post(conn, EXCEPTION, NO_SUBSCRIBE_INFO, datagram.Tag, datagram.ServiceId, key, true)
 		}
 
 	}
@@ -405,7 +405,7 @@ func (r *RegisterCenter) handleGet(conn net.Conn, datagram DataGram, id int64) {
 func (r RegisterCenter) handleAPIlist(conn net.Conn, datagram DataGram, id int64) {
 	datas, ok := datagram.Data.Body.([]interface{})
 	if !ok {
-		r.post(conn, EXCEPTION, API_DATA_FORM_EXECPTION, datagram.Tag, datagram.ServiceId, DefaultInt)
+		r.post(conn, EXCEPTION, API_DATA_FORM_EXECPTION, datagram.Tag, datagram.ServiceId, DefaultInt, true)
 		return
 	}
 	apis := make([]API, 0)
@@ -445,14 +445,14 @@ func (r *RegisterCenter) subscribeUpdate() {
 		_, ok := r.DataMap[update.Key]
 		r.rLocker[update.Key] = true
 		if r.DataMap[update.Key] != update.Request.Origin && ok == true {
-			r.post(update.From, EXCEPTION, ORIGINAL_DATA_EXPIRED, update.Tag, update.ServiceId, update.Key)
+			r.post(update.From, EXCEPTION, ORIGINAL_DATA_EXPIRED, update.Tag, update.ServiceId, update.Key, true)
 			r.rLocker[update.Key] = false
 			continue
 		}
 		r.DataMap[update.Key] = update.Request.New
-		r.post(update.From, SUCCESS, nil, update.Tag, update.ServiceId, update.Key)
+		r.post(update.From, SUCCESS, nil, update.Tag, update.ServiceId, update.Key, true)
 		for _, subscribe := range r.Subscribes[update.Key].Subscribers {
-			r.post(r.socketPool[subscribe], UPDATE, update.Request.New, DefaultTag, DefaultInt, update.Key)
+			r.post(r.socketPool[subscribe], UPDATE, update.Request.New, DefaultTag, DefaultInt, update.Key, true)
 		}
 		r.persistenceChannel <- r.PackageFile()
 		r.rLocker[update.Key] = false
@@ -487,7 +487,7 @@ func (r *RegisterCenter) isActive(id int64) {
 		return
 	}
 	r.ServiceActive[id] = Pending
-	r.post(conn, IS_ACTIVE, nil, DefaultTag, id, DefaultInt)
+	r.post(conn, IS_ACTIVE, nil, DefaultTag, id, DefaultInt, true)
 }
 
 //
@@ -515,7 +515,7 @@ func (r *RegisterCenter) timingStatusCheck() {
 //  @param serviceId	服务编号
 //  @param key	数据报关键字
 //
-func (r *RegisterCenter) post(conn net.Conn, title PostTitle, data interface{}, tag string, serviceId int64, key int64) {
+func (r *RegisterCenter) post(conn net.Conn, title PostTitle, data interface{}, tag string, serviceId int64, key int64, resend bool) {
 	centerTag := createToken(time.Now().Format("2006-01-02-15:04:05"))
 	datagram := DataGram{
 		Tag:       tag,
@@ -547,7 +547,7 @@ func (r *RegisterCenter) post(conn net.Conn, title PostTitle, data interface{}, 
 		r.logger.Error(err.Error())
 		go r.LogClient.Report(Log_Error, err.Error())
 	}
-	if title != CONFIRM {
+	if resend {
 		r.pendingList[centerTag] = PendingItem{
 			Time:        time.Now(),
 			ResendTimes: 0,
@@ -564,7 +564,7 @@ func (r *RegisterCenter) post(conn net.Conn, title PostTitle, data interface{}, 
 //
 func (r *RegisterCenter) resend() {
 	for {
-		time.Sleep(30 * time.Second)
+		time.Sleep(1 * time.Minute)
 		for key, item := range r.pendingList {
 			if item.ResendTimes > 10 {
 				r.logger.Error("the datagram has sent to many times : ", item.Message)
@@ -573,8 +573,8 @@ func (r *RegisterCenter) resend() {
 				delete(r.pendingList, key)
 				continue
 			}
-			subTime := time.Now().Sub(item.Time).Seconds()
-			if subTime > 30 {
+			subTime := time.Now().Sub(item.Time).Minutes()
+			if subTime > 1 {
 				bytes, _ := json.Marshal(item.Message)
 				if item.Conn == nil {
 					r.logger.Error("conn closed : ", item.Message)
