@@ -518,10 +518,12 @@ func (r *RegisterCenter) post(conn net.Conn, title PostTitle, data interface{}, 
 	if err != nil {
 		r.logger.Error(err.Error())
 		go r.LogClient.Report(Log_Error, err.Error())
+		return
 	}
 	if conn == nil {
 		r.logger.Error("no conn found")
 		go r.LogClient.Report(Log_Error, "no conn found")
+		return
 	}
 	_, err = conn.Write(bytes)
 	if err != nil {
