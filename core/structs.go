@@ -18,6 +18,7 @@ const (
 	GET            = "GET"
 	LINK           = "LINK"
 	UPDATE         = "UPDATE"
+	UPDATE_F       = "UPDATE_F"
 	CONFIRM        = "CONFIRM"
 	SUCCESS        = "SUCCESS"
 	CONNECT        = "CONNECT"
@@ -197,6 +198,7 @@ type UpdatePackage struct {
 	From      net.Conn
 	Key       int64
 	Request   UpdateRequset
+	Force     bool
 }
 
 type Data struct {

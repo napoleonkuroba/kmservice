@@ -271,8 +271,11 @@ func (r *RegisterCenter) handle(id int64) {
 		}
 		switch datagram.Data.Title {
 		//处理更新请求
+		case UPDATE_F:
+			r.handleUpdate(conn, datagram, id, true)
+			continue
 		case UPDATE:
-			r.handleUpdate(conn, datagram, id)
+			r.handleUpdate(conn, datagram, id, false)
 			continue
 		case GET:
 			r.handleGet(conn, datagram, id)
@@ -358,7 +361,7 @@ func (r *RegisterCenter) handleLink(conn net.Conn, datagram DataGram) {
 	return
 }
 
-func (r *RegisterCenter) handleUpdate(conn net.Conn, datagram DataGram, id int64) {
+func (r *RegisterCenter) handleUpdate(conn net.Conn, datagram DataGram, id int64, force bool) {
 	bytes, err := json.Marshal(datagram.Data.Body)
 	if err != nil {
 		r.logger.Error(err.Error())
@@ -382,6 +385,7 @@ func (r *RegisterCenter) handleUpdate(conn net.Conn, datagram DataGram, id int64
 				ServiceId: datagram.ServiceId,
 				From:      conn,
 				Key:       datagram.Data.Key,
+				Force:     force,
 				Request: UpdateRequset{
 					Origin: data.Origin,
 					New:    data.New,
@@ -482,10 +486,13 @@ func (r *RegisterCenter) subscribeUpdate() {
 		//订阅加锁
 		_, ok := r.DataMap[update.Key]
 		r.rLocker[update.Key] = true
-		if r.DataMap[update.Key] != update.Request.Origin && ok == true {
-			r.post(update.From, EXCEPTION, ORIGINAL_DATA_EXPIRED, update.Tag, update.ServiceId, update.Key, true)
-			r.rLocker[update.Key] = false
-			continue
+
+		if !update.Force {
+			if r.DataMap[update.Key] != update.Request.Origin && ok == true {
+				r.post(update.From, EXCEPTION, ORIGINAL_DATA_EXPIRED, update.Tag, update.ServiceId, update.Key, true)
+				r.rLocker[update.Key] = false
+				continue
+			}
 		}
 		r.DataMap[update.Key] = update.Request.New
 		r.post(update.From, SUCCESS, nil, update.Tag, update.ServiceId, update.Key, true)
