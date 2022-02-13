@@ -112,10 +112,8 @@ func (p *Peer) listen() {
 			}
 		case core.UPDATE:
 			{
-				go func() {
-					p.peerData[data.Data.Key] = data.Data.Body
-					p.getList[data.Data.Key] = false
-				}()
+				p.peerData[data.Data.Key] = data.Data.Body
+				p.getList[data.Data.Key] = false
 				break
 			}
 		case core.SUCCESS:
@@ -127,16 +125,17 @@ func (p *Peer) listen() {
 			{
 				tag := data.Data.Body.(string)
 				delete(p.pendingList, tag)
+				break
 			}
 		case core.LINK_SUBMIT:
 			{
 				p.handleLinkSubmit(data)
-				continue
+				break
 			}
 		case core.FIND_LINK:
 			{
 				p.handleFindLink(data)
-				continue
+				break
 			}
 		case core.SUBSCRIBES:
 			{
@@ -154,6 +153,7 @@ func (p *Peer) listen() {
 					return
 				}
 				p.subscribeKeys = subscribeMap
+				break
 			}
 		}
 	}
