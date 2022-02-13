@@ -75,12 +75,8 @@ func NewPeer(config PeerConfig, sql *xorm.Engine, logSql *xorm.Engine, logger *l
 //  @receiver p
 //
 func (p *Peer) Run() {
-	err := p.connect()
-	if err != nil {
-		p.logger.Fatal(err.Error())
-	}
 	go p.resend()
-	p.listen()
+	p.connect()
 }
 
 //
