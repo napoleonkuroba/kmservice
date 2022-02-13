@@ -81,6 +81,7 @@ func (p *Peer) listen() {
 		var data core.DataGram
 		err = json.Unmarshal(buff[:length], &data)
 		if err != nil {
+			p.logger.Error(buff[:length])
 			p.logger.Error(err.Error())
 			go p.LogClient.Report(core.Log_Error, err.Error())
 			p.errorTimes--
