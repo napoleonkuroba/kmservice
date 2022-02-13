@@ -241,6 +241,7 @@ func (r *RegisterCenter) listen(id int64) {
 		if err != nil {
 			r.logger.Error(err.Error())
 			go r.LogClient.Report(Log_Error, err.Error())
+			r.socketPool[id] = nil
 			return
 		}
 		dataBytes := buff[:length]
@@ -261,8 +262,7 @@ func (r *RegisterCenter) handle(id int64) {
 		r.logger.Info("recived ", datagram)
 		conn := r.socketPool[id]
 		if conn == nil {
-			r.logger.Error("handle connection closed : id = ", strconv.Itoa(int(id)))
-			go r.LogClient.Report(Log_Error, "handle connection closed : id = "+strconv.Itoa(int(id)))
+			return
 		}
 		switch datagram.Data.Title {
 		//处理更新请求

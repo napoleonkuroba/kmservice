@@ -303,6 +303,9 @@ func (p *Peer) handleFindLink(data core.DataGram) {
 //
 func (p *Peer) post(data core.DataGram) error {
 	bytes, err := data.Package()
+
+	p.logger.Info("post:", string(bytes))
+
 	if err != nil {
 		return err
 	}

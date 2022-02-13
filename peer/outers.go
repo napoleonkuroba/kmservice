@@ -151,7 +151,7 @@ func (p *Peer) POST(postTitle core.PostTitle, key string, body interface{}) {
 			Body:      body,
 		},
 	}
-
+	p.logger.Info("post:", data)
 	p.post(data)
 }
 
