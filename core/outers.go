@@ -156,12 +156,12 @@ func (r *RegisterCenter) LoadSQLconfig() {
 			panic(err.Error())
 		}
 		if config.Id <= 0 {
-			_, err = r.LogClient.SqlClient.Insert(&config)
+			_, err = r.LogClient.SqlClient.Insert(&sqlConfig)
 			if err != nil {
 				panic(err.Error())
 			}
 		} else {
-			_, err = r.LogClient.SqlClient.Where("Id=?", config.Id).Update(&config)
+			_, err = r.LogClient.SqlClient.Where("Id=?", sqlConfig.Id).Update(&sqlConfig)
 			if err != nil {
 				panic(err.Error())
 			}
