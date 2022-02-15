@@ -97,7 +97,7 @@ func (p *Peer) unpacking() {
 					go p.LogClient.Report(core.Log_Error, err.Error())
 				} else {
 					if dataGram.Data.Title == core.CONFIRM {
-						delete(p.pendingList, dataGram.CenterTag)
+						delete(p.pendingList, dataGram.Tag)
 					} else {
 						p.post(core.DataGram{
 							Tag:       p.createTag(core.CONFIRM),

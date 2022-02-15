@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"github.com/hducqa/kmservice/core"
 	"github.com/sirupsen/logrus"
-	"log"
 	"math/rand"
 	"net"
-	"runtime"
 	"time"
 )
 
@@ -65,15 +63,6 @@ func createLink(logger *logrus.Logger, token string, port string, logClient *cor
 		LinkNumber: 0,
 		LinkFields: make([]LinkField, 0),
 		DataField:  make([]interface{}, 0),
-	}
-	skip := 0
-	for {
-		pc, file, line, ok := runtime.Caller(skip)
-		if ok == false {
-			break
-		}
-		log.Printf("%v %s:%d %v", runtime.FuncForPC(pc).Name(), file, line, ok)
-		skip++
 	}
 	go link.linkListen(port)
 	return &link

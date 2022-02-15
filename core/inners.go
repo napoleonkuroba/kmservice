@@ -642,7 +642,7 @@ func (r *RegisterCenter) resend() {
 				continue
 			}
 			subTime := time.Now().Sub(item.Time).Minutes()
-			if subTime > 1 {
+			if subTime > 3 {
 				bytes, err := item.Message.Package()
 				if err != nil {
 					r.logger.Error(err.Error())
