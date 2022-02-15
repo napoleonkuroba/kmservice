@@ -53,7 +53,7 @@ func NewCenter(persistencePath string, logger *logrus.Logger, poolsize int, sqlC
 		persistence(FileStorage{DataMap: make(map[int64]interface{})}, persistencePath)
 	}
 
-	sqlConfigMap := InitSQLMap(sqlConfigPath)
+	sqlConfigMap := initSQLMap(sqlConfigPath)
 	logSql := NewSQLClient(sqlConfigMap[logSqlConfigTitle], logger)
 	logClient := LogClient{
 		SqlClient:   logSql,
@@ -577,4 +577,17 @@ func (r *RegisterCenter) DeleteSqlConfig(configId int64) bool {
 	}
 	r.LoadSQLconfig()
 	return true
+}
+
+//
+//  GetSqlConfig
+//  @Description: 获取指定标题的数据库配置
+//  @receiver l
+//  @param title
+//  @return SqlConfig
+//
+func (l *LogClient) GetSqlConfig(title string) SqlConfig {
+	sqlConfig := SqlConfig{Title: title}
+	l.SqlClient.Get(&sqlConfig)
+	return sqlConfig
 }

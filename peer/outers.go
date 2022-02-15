@@ -325,16 +325,3 @@ func (p *Peer) Link(key string, desc string) *Link {
 	}
 	return nil
 }
-
-//
-//  GetSqlConfig
-//  @Description: 获取指定标题的数据库配置
-//  @receiver p
-//  @param title
-//  @return core.SqlConfig
-//
-func (p *Peer) GetSqlConfig(title string) core.SqlConfig {
-	sqlConfig := core.SqlConfig{Title: title}
-	p.LogClient.SqlClient.Get(&sqlConfig)
-	return sqlConfig
-}

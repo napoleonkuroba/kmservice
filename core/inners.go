@@ -13,6 +13,29 @@ import (
 )
 
 //
+//  LoadSQLconfig
+//  @Description: 加载sql配置
+//  @receiver r
+//
+func initSQLMap(configFile string) map[string]SqlConfig {
+	sqlConfigs := make([]SqlConfig, 0)
+	file, err := os.Open(configFile)
+	if err != nil {
+		panic(err.Error())
+	}
+	decoder := json.NewDecoder(file)
+	err = decoder.Decode(&sqlConfigs)
+	if err != nil {
+		panic(err.Error())
+	}
+	configMap := make(map[string]SqlConfig)
+	for _, sqlConfig := range sqlConfigs {
+		configMap[sqlConfig.Title] = sqlConfig
+	}
+	return configMap
+}
+
+//
 //  loadServices
 //  @Description: 从数据库中加载所有已管理的服务
 //  @receiver r
