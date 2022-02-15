@@ -1,9 +1,9 @@
 package core
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/go-xorm/xorm"
 	socketio "github.com/googollee/go-socket.io"
 	"github.com/sirupsen/logrus"
 	"net"
@@ -16,14 +16,16 @@ import (
 //
 //  NewCenter
 //  @Description: 创建新的注册中心
-//  @param sql	数据库引擎
 //  @param persistencePath	持久化文件路径
 //  @param logger
 //  @param poolsize
+//  @param sqlConfigPath	数据库配置表路径
+//  @param logSqlConfigTitle
+//  @param dataSqlConfigTitle
 //  @return *RegisterCenter
 //  @return error
 //
-func NewCenter(sql *xorm.Engine, logSql *xorm.Engine, persistencePath string, logger *logrus.Logger, poolsize int) (*RegisterCenter, error) {
+func NewCenter(persistencePath string, logger *logrus.Logger, poolsize int, sqlConfigPath string, logSqlConfigTitle string, dataSqlConfigTitle string) (*RegisterCenter, error) {
 	persistencePath = strings.ReplaceAll(persistencePath, " ", "")
 	if persistencePath == "" {
 		persistencePath = "./"
@@ -50,11 +52,15 @@ func NewCenter(sql *xorm.Engine, logSql *xorm.Engine, persistencePath string, lo
 		}
 		persistence(FileStorage{DataMap: make(map[int64]interface{})}, persistencePath)
 	}
+
+	sqlConfigMap := InitSQLMap(sqlConfigPath)
+	logSql := NewSQLClient(sqlConfigMap[logSqlConfigTitle], logger)
 	logClient := LogClient{
 		SqlClient:   logSql,
 		ServiceId:   0,
 		ServiceName: "",
 	}
+	dataSql := NewSQLClient(sqlConfigMap[dataSqlConfigTitle], logger)
 
 	center := RegisterCenter{
 		readChannel:         make(map[int64]chan byte),
@@ -62,9 +68,10 @@ func NewCenter(sql *xorm.Engine, logSql *xorm.Engine, persistencePath string, lo
 		persistenceFilePath: persistencePath,
 		DataMap:             make(map[int64]interface{}),
 		Subscribes:          make(map[int64]Subscribe),
-		sqlClient:           sql,
+		sqlClient:           dataSql,
 		ServiceCache:        make(map[int64]MicroService),
 		ServiceActive:       make(map[int64]ServiceState),
+		SQLConfigFile:       sqlConfigPath,
 		webSocketServer:     socketio.NewServer(nil),
 		logger:              logger,
 		LogClient:           &logClient,
@@ -78,11 +85,11 @@ func NewCenter(sql *xorm.Engine, logSql *xorm.Engine, persistencePath string, lo
 		pendingList:         make(map[string]PendingItem),
 	}
 
-	err = sql.Sync2(new(MicroService), new(Subscribe))
+	err = dataSql.Sync2(new(MicroService), new(Subscribe))
 	if err != nil {
 		return nil, err
 	}
-	err = logSql.Sync2(new(Log))
+	err = logSql.Sync2(new(Log), new(SqlConfig))
 	if err != nil {
 		return nil, err
 	}
@@ -96,6 +103,7 @@ func NewCenter(sql *xorm.Engine, logSql *xorm.Engine, persistencePath string, lo
 //  @param port	监听端口
 //
 func (r *RegisterCenter) Run(port string) {
+	r.LoadSQLconfig()
 	r.loadSubscribes()
 	r.loadServices()
 	go r.subscribeUpdate()
@@ -122,6 +130,42 @@ func (r *RegisterCenter) Run(port string) {
 			go r.LogClient.Report(Log_Error, err.Error())
 		}
 		r.socketHandle(conn)
+	}
+}
+
+//
+//  LoadSQLconfig
+//  @Description: 加载sql配置
+//  @receiver r
+//
+func (r *RegisterCenter) LoadSQLconfig() {
+	sqlConfigs := make([]SqlConfig, 0)
+	file, err := os.Open(r.SQLConfigFile)
+	if err != nil {
+		panic(err.Error())
+	}
+	decoder := json.NewDecoder(file)
+	err = decoder.Decode(&sqlConfigs)
+	if err != nil {
+		panic(err.Error())
+	}
+	for _, sqlConfig := range sqlConfigs {
+		config := SqlConfig{Title: sqlConfig.Title}
+		_, err = r.LogClient.SqlClient.Insert(&config)
+		if err != nil {
+			panic(err.Error())
+		}
+		if config.Id <= 0 {
+			_, err = r.LogClient.SqlClient.Insert(&config)
+			if err != nil {
+				panic(err.Error())
+			}
+		} else {
+			_, err = r.LogClient.SqlClient.Where("Id=?", config.Id).Update(&config)
+			if err != nil {
+				panic(err.Error())
+			}
+		}
 	}
 }
 
@@ -475,4 +519,62 @@ func (l *LogClient) GetLogs() ([]Log, error) {
 		return nil, err
 	}
 	return logs, nil
+}
+
+//
+//  GetSQLConfigTable
+//  @Description: 获取sql配置表
+//  @receiver r
+//  @return []SqlConfig
+//
+func (r *RegisterCenter) GetSQLConfigTable() []SqlConfig {
+	configs := make([]SqlConfig, 0)
+	err := r.sqlClient.Find(&configs)
+	if err != nil {
+		r.logger.Error(err.Error())
+	}
+	return configs
+}
+
+//
+//  CreateSqlConfig
+//  @Description: 创建sql配置文件
+//  @receiver r
+//  @param config
+//  @return bool
+//
+func (r *RegisterCenter) CreateSqlConfig(config SqlConfig) bool {
+	info := SqlConfig{Title: config.Title}
+	_, err := r.LogClient.SqlClient.Get(&info)
+	if err != nil {
+		r.logger.Error(err.Error())
+		return false
+	}
+	if info.Id > 0 {
+		return false
+	}
+	info = config
+	info.Id = 0
+	_, err = r.LogClient.SqlClient.Insert(&info)
+	if err != nil {
+		return false
+	}
+	return true
+}
+
+//
+//  DeleteSqlConfig
+//  @Description: 删除sql配置文件
+//  @receiver r
+//  @param configId
+//  @return bool
+//
+func (r *RegisterCenter) DeleteSqlConfig(configId int64) bool {
+	_, err := r.sqlClient.Delete(&SqlConfig{Id: configId})
+	if err != nil {
+		r.logger.Error(err.Error())
+		return false
+	}
+	r.LoadSQLconfig()
+	return true
 }

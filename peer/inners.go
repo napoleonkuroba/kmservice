@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/hducqa/kmservice/core"
-	"io/ioutil"
 	"math/rand"
 	"net"
 	"os"
@@ -202,6 +201,7 @@ func (p *Peer) handle() {
 //
 func (p *Peer) handleException(data core.DataGram) {
 	errorType := data.Data.Body.(string)
+	p.logger.Error(data)
 	switch errorType {
 	case core.ORIGINAL_DATA_EXPIRED:
 		p.updateRequestList[data.Data.Key] = -1
@@ -209,7 +209,6 @@ func (p *Peer) handleException(data core.DataGram) {
 	case core.GET_DATA_FORM_EXECPTION:
 		{
 			p.getList = make(map[int64]bool)
-			p.dataGramLog(data)
 			break
 		}
 	case core.DATA_LOCKED:
@@ -236,12 +235,10 @@ func (p *Peer) handleException(data core.DataGram) {
 				break
 			}
 			p.getList[id] = false
-			p.dataGramLog(data)
 			break
 		}
 	case core.REQUEST_TYPE_EXCEPTION:
 		{
-			p.dataGramLog(data)
 			break
 		}
 	}
@@ -317,14 +314,8 @@ func (p *Peer) post(data core.DataGram) error {
 	if err != nil {
 		return err
 	}
-	storage := DataGramStorage{
-		ServiceId: p.ServiceId,
-		Tag:       data.Tag,
-		PostType:  data.Data.Title,
-	}
 	if data.Data.Title != core.IS_ACTIVE && data.Data.Title != core.CONFIRM {
 		go func() {
-			p.sqlClient.Insert(&storage)
 			fileBytes, _ := json.Marshal(data)
 			f, _ := os.OpenFile(p.filePath+data.Tag+strconv.Itoa(int(p.ServiceId)), os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
 			defer f.Close()
@@ -356,44 +347,6 @@ func (p Peer) createTag(title core.PostTitle) string {
 		bytes[i] = byte(b)
 	}
 	return string(bytes) + "-" + strconv.Itoa(int(p.ServiceId)) + "-" + string(title)
-}
-
-//
-//  dataGramLog
-//  @Description: 记录数据传输异常日志
-//  @receiver p
-//  @param data
-//
-func (p *Peer) dataGramLog(data core.DataGram) {
-	storage := DataGramStorage{
-		ServiceId: data.ServiceId,
-		Tag:       data.Tag,
-	}
-	_, err := p.sqlClient.Get(&storage)
-	if err != nil {
-		p.logger.Error(err.Error(), " ", data.Tag, " ", data.Data.Title)
-		go p.LogClient.Report(core.Log_Error, err.Error()+" tag: "+data.Tag+" title: "+string(data.Data.Title))
-	} else {
-		file, err := os.Open(p.filePath + data.Tag + strconv.Itoa(int(storage.ServiceId)))
-		defer file.Close()
-		if err != nil {
-			p.logger.Error(err.Error())
-			go p.LogClient.Report(core.Log_Error, err.Error())
-		}
-		bytes, err := ioutil.ReadAll(file)
-		if err != nil {
-			p.logger.Error(err.Error())
-			go p.LogClient.Report(core.Log_Error, err.Error())
-		}
-		var dataBody core.Data
-		err = json.Unmarshal(bytes, &dataBody)
-		if err != nil {
-			p.logger.Error(err.Error())
-			go p.LogClient.Report(core.Log_Error, err.Error())
-		}
-		p.logger.Error(data.Tag, " ", data.Data.Title, " ", dataBody)
-		go p.LogClient.Report(core.Log_Error, "tag"+data.Tag+" title: "+string(data.Data.Title))
-	}
 }
 
 //

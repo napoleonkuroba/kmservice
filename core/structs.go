@@ -72,6 +72,7 @@ type RegisterCenter struct {
 	sqlClient           *xorm.Engine           //数据库引擎
 	ServiceCache        map[int64]MicroService //缓存所有服务基本信息
 	ServiceActive       map[int64]ServiceState //记录服务是否活跃
+	SQLConfigFile       string
 
 	webSocketServer *socketio.Server //websocket服务
 	logger          *logrus.Logger   //日志管理
@@ -100,6 +101,17 @@ type LogClient struct {
 	SqlClient   *xorm.Engine
 	ServiceId   int64
 	ServiceName string
+}
+
+type SqlConfig struct {
+	Id       int64  `json:"id"`
+	Title    string `json:"title"`
+	Driver   string `json:"sql_driver"`
+	Host     string `json:"sql_host"`
+	Port     string `json:"sql_port"`
+	User     string `json:"sql_user"`
+	Password string `json:"sql_password"`
+	Database string `json:"sql_database"`
 }
 
 type Log struct {

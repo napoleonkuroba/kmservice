@@ -21,9 +21,8 @@ import (
 //  @param maxerrorTimes 最大错误次数
 //  @return *Peer
 //
-func NewPeer(config PeerConfig, sql *xorm.Engine, logSql *xorm.Engine, logger *logrus.Logger, maxerrorTimes int, persistencePath string) *Peer {
-	sql.Sync2(new(DataGramStorage))
-	logSql.Sync2(new(core.Log))
+func NewPeer(config PeerConfig, logSql *xorm.Engine, logger *logrus.Logger, maxerrorTimes int, persistencePath string) *Peer {
+	logSql.Sync2(new(core.Log), new(core.SqlConfig))
 	persistencePath = strings.ReplaceAll(persistencePath, " ", "")
 	if persistencePath == "" {
 		persistencePath = "./"
@@ -56,7 +55,6 @@ func NewPeer(config PeerConfig, sql *xorm.Engine, logSql *xorm.Engine, logger *l
 		LinkInfos:         make(map[string]core.LinkInfo),
 		Links:             make(map[string]*Link),
 		logger:            logger,
-		sqlClient:         sql,
 		LogClient: &core.LogClient{
 			SqlClient:   logSql,
 			ServiceId:   config.ServiceId,
@@ -326,4 +324,17 @@ func (p *Peer) Link(key string, desc string) *Link {
 		return &link
 	}
 	return nil
+}
+
+//
+//  GetSqlConfig
+//  @Description: 获取指定标题的数据库配置
+//  @receiver p
+//  @param title
+//  @return core.SqlConfig
+//
+func (p *Peer) GetSqlConfig(title string) core.SqlConfig {
+	sqlConfig := core.SqlConfig{Title: title}
+	p.LogClient.SqlClient.Get(&sqlConfig)
+	return sqlConfig
 }

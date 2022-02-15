@@ -59,13 +59,6 @@ type PeerConfig struct {
 	FilePath    string `json:"peer_file_path"`
 }
 
-type DataGramStorage struct {
-	Id        int64
-	ServiceId int64
-	Tag       string
-	PostType  core.PostTitle
-}
-
 type PendingGram struct {
 	Time        time.Time
 	ResendTimes int
