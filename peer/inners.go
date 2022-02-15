@@ -391,7 +391,7 @@ func (p *Peer) resend() {
 				continue
 			}
 			subTime := time.Now().Sub(item.Time).Minutes()
-			if subTime > 1 {
+			if subTime > 2 {
 				bytes, err := item.Message.Package()
 				if err != nil {
 					p.logger.Error(err.Error())
