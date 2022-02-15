@@ -106,12 +106,12 @@ type LogClient struct {
 type SqlConfig struct {
 	Id       int64  `json:"id"`
 	Title    string `json:"title"`
-	Driver   string `json:"sql_driver"`
-	Host     string `json:"sql_host"`
-	Port     string `json:"sql_port"`
-	User     string `json:"sql_user"`
-	Password string `json:"sql_password"`
-	Database string `json:"sql_database"`
+	Driver   string `json:"driver"`
+	Host     string `json:"host"`
+	Port     string `json:"port"`
+	User     string `json:"user"`
+	Password string `json:"password"`
+	Database string `json:"database"`
 }
 
 type Log struct {
