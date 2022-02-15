@@ -151,7 +151,7 @@ func (r *RegisterCenter) LoadSQLconfig() {
 	}
 	for _, sqlConfig := range sqlConfigs {
 		config := SqlConfig{Title: sqlConfig.Title}
-		_, err = r.LogClient.SqlClient.Insert(&config)
+		_, err = r.LogClient.SqlClient.Get(&config)
 		if err != nil {
 			panic(err.Error())
 		}
