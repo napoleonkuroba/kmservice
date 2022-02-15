@@ -66,10 +66,12 @@ func createLink(logger *logrus.Logger, token string, port string, logClient *cor
 		LinkFields: make([]LinkField, 0),
 		DataField:  make([]interface{}, 0),
 	}
-	ok := true
 	skip := 0
-	for ok {
+	for {
 		pc, file, line, ok := runtime.Caller(skip)
+		if ok == false {
+			break
+		}
 		log.Printf("%v %s:%d %v", runtime.FuncForPC(pc).Name(), file, line, ok)
 		skip++
 	}
