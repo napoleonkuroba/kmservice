@@ -43,7 +43,7 @@ func initSQLMap(configFile string) map[string]SqlConfig {
 //
 func (r *RegisterCenter) loadServices() error {
 	services := make([]MicroService, 0)
-	err := r.sqlClient.Find(&services)
+	err := r.SqlClient.Find(&services)
 	if err != nil {
 		return nil
 	}
@@ -61,7 +61,7 @@ func (r *RegisterCenter) loadServices() error {
 //
 func (r *RegisterCenter) loadSubscribes() error {
 	subscribes := make([]Subscribe, 0)
-	err := r.sqlClient.Find(&subscribes)
+	err := r.SqlClient.Find(&subscribes)
 	if err != nil {
 		return nil
 	}
@@ -166,7 +166,7 @@ func (r *RegisterCenter) socketHandle(conn net.Conn) {
 	}
 	//从数据库中获取服务的注册信息
 	service := MicroService{Id: apply.Id}
-	exist, err := r.sqlClient.Get(&service)
+	exist, err := r.SqlClient.Get(&service)
 	if err != nil {
 		r.logger.Error(err.Error())
 		go r.LogClient.Report(Log_Error, err.Error())
@@ -492,7 +492,7 @@ func (r RegisterCenter) handleAPIlist(conn net.Conn, datagram DataGram, id int64
 	}
 
 	service := MicroService{Id: id, APIs: apis}
-	r.sqlClient.Where("Id=?", id).Update(&service)
+	r.SqlClient.Where("Id=?", id).Update(&service)
 	r.loadServices()
 	return
 }

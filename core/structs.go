@@ -69,7 +69,7 @@ type RegisterCenter struct {
 	persistenceFilePath string                 //持久化文件路径
 	DataMap             map[int64]interface{}  //共享文件库
 	Subscribes          map[int64]Subscribe    //订阅名单
-	sqlClient           *xorm.Engine           //数据库引擎
+	SqlClient           *xorm.Engine           //数据库引擎
 	ServiceCache        map[int64]MicroService //缓存所有服务基本信息
 	ServiceActive       map[int64]ServiceState //记录服务是否活跃
 	SQLConfigFile       string

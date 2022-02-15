@@ -68,7 +68,7 @@ func NewCenter(persistencePath string, logger *logrus.Logger, poolsize int, sqlC
 		persistenceFilePath: persistencePath,
 		DataMap:             make(map[int64]interface{}),
 		Subscribes:          make(map[int64]Subscribe),
-		sqlClient:           dataSql,
+		SqlClient:           dataSql,
 		ServiceCache:        make(map[int64]MicroService),
 		ServiceActive:       make(map[int64]ServiceState),
 		SQLConfigFile:       sqlConfigPath,
@@ -180,7 +180,7 @@ func (r *RegisterCenter) LoadSQLconfig() {
 func (r *RegisterCenter) RegisterService(service MicroService) (string, error) {
 	token := createToken("")
 	service.Token = token
-	_, err := r.sqlClient.Insert(&service)
+	_, err := r.SqlClient.Insert(&service)
 	if err != nil {
 		return "", err
 	}
@@ -196,7 +196,7 @@ func (r *RegisterCenter) RegisterService(service MicroService) (string, error) {
 //  @return error
 //
 func (r *RegisterCenter) CreateSubscribe(subscribe Subscribe) error {
-	_, err := r.sqlClient.Insert(&subscribe)
+	_, err := r.SqlClient.Insert(&subscribe)
 	if err != nil {
 		return err
 	}
@@ -213,7 +213,7 @@ func (r *RegisterCenter) CreateSubscribe(subscribe Subscribe) error {
 //  @return error
 //
 func (r *RegisterCenter) UpdateServiceInfo(service MicroService) error {
-	_, err := r.sqlClient.Where("Id=?", service.Id).Update(&service)
+	_, err := r.SqlClient.Where("Id=?", service.Id).Update(&service)
 	if err != nil {
 		return err
 	}
@@ -229,7 +229,7 @@ func (r *RegisterCenter) UpdateServiceInfo(service MicroService) error {
 //  @return error
 //
 func (r *RegisterCenter) UpdateSubscribeInfo(subscribe Subscribe) error {
-	_, err := r.sqlClient.Where("Id=?", subscribe.Id).Update(&subscribe)
+	_, err := r.SqlClient.Where("Id=?", subscribe.Id).Update(&subscribe)
 	if err != nil {
 		return err
 	}
@@ -247,12 +247,12 @@ func (r *RegisterCenter) UpdateSubscribeInfo(subscribe Subscribe) error {
 //
 func (r *RegisterCenter) DeleteService(id int64) error {
 	service := MicroService{Id: id}
-	_, err := r.sqlClient.Delete(service)
+	_, err := r.SqlClient.Delete(service)
 	if err != nil {
 		return err
 	}
 	subscribes := make([]Subscribe, 0)
-	err = r.sqlClient.Find(&subscribes)
+	err = r.SqlClient.Find(&subscribes)
 	if err != nil {
 		return err
 	}
@@ -280,7 +280,7 @@ func (r *RegisterCenter) DeleteService(id int64) error {
 			}
 		}
 		if changed {
-			_, err = r.sqlClient.Where("Id=?", subscribe.Id).Update(&subscribe)
+			_, err = r.SqlClient.Where("Id=?", subscribe.Id).Update(&subscribe)
 			if err != nil {
 				r.logger.Error(err.Error())
 				go r.LogClient.Report(Log_Error, err.Error())
@@ -310,7 +310,7 @@ func (r *RegisterCenter) DeleteService(id int64) error {
 //
 func (r *RegisterCenter) DeleteSubscribe(id int64) error {
 	subscribe := Subscribe{Id: id}
-	_, err := r.sqlClient.Delete(subscribe)
+	_, err := r.SqlClient.Delete(subscribe)
 	if err != nil {
 		return err
 	}
@@ -341,7 +341,7 @@ func (r *RegisterCenter) Subscribe(subscriber int64, id int64) error {
 		}
 	}
 	subscribe.Subscribers = append(subscribe.Subscribers, subscriber)
-	_, err := r.sqlClient.Where("Id=?", id).Update(&subscribe)
+	_, err := r.SqlClient.Where("Id=?", id).Update(&subscribe)
 	if err != nil {
 		return err
 	}
@@ -382,7 +382,7 @@ func (r *RegisterCenter) CancelSubscribe(subscriber int64, id int64) error {
 	if !changed {
 		return nil
 	}
-	_, err := r.sqlClient.Where("Id=?", id).Update(&subscribe)
+	_, err := r.SqlClient.Where("Id=?", id).Update(&subscribe)
 	if err != nil {
 		return err
 	}
@@ -410,7 +410,7 @@ func (r *RegisterCenter) WriteApply(writer int64, id int64) error {
 		}
 	}
 	subscribe.Writers = append(subscribe.Writers, writer)
-	_, err := r.sqlClient.Where("Id=?", id).Update(&subscribe)
+	_, err := r.SqlClient.Where("Id=?", id).Update(&subscribe)
 	if err != nil {
 		return err
 	}
@@ -442,7 +442,7 @@ func (r *RegisterCenter) CancelWrite(writer int64, id int64) error {
 			break
 		}
 	}
-	_, err := r.sqlClient.Where("Id=?", id).Update(&subscribe)
+	_, err := r.SqlClient.Where("Id=?", id).Update(&subscribe)
 	if err != nil {
 		return err
 	}
@@ -529,7 +529,7 @@ func (l *LogClient) GetLogs() ([]Log, error) {
 //
 func (r *RegisterCenter) GetSQLConfigTable() []SqlConfig {
 	configs := make([]SqlConfig, 0)
-	err := r.sqlClient.Find(&configs)
+	err := r.SqlClient.Find(&configs)
 	if err != nil {
 		r.logger.Error(err.Error())
 	}
@@ -570,7 +570,7 @@ func (r *RegisterCenter) CreateSqlConfig(config SqlConfig) bool {
 //  @return bool
 //
 func (r *RegisterCenter) DeleteSqlConfig(configId int64) bool {
-	_, err := r.sqlClient.Delete(&SqlConfig{Id: configId})
+	_, err := r.SqlClient.Delete(&SqlConfig{Id: configId})
 	if err != nil {
 		r.logger.Error(err.Error())
 		return false
