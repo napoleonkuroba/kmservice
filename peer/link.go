@@ -71,6 +71,7 @@ func createLink(logger *logrus.Logger, token string, port string, logClient *cor
 	for ok {
 		pc, file, line, ok := runtime.Caller(skip)
 		log.Printf("%v %s:%d %v", runtime.FuncForPC(pc).Name(), file, line, ok)
+		skip++
 	}
 	go link.linkListen(port)
 	return &link
