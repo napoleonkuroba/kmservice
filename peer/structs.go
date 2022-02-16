@@ -32,8 +32,7 @@ type Peer struct {
 	subscribeKeys     map[string]int64
 	pendingList       map[string]PendingGram //等待队列
 
-	LinkApplys map[string]core.DataGram //连接请求缓存
-	LinkInfos  map[string]core.LinkInfo //连接配置
+	LinkInfos map[string]core.LinkInfo //连接配置
 
 	Links map[string]*Link
 

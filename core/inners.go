@@ -287,7 +287,9 @@ func (r *RegisterCenter) listen(id int64) {
 //
 func (r *RegisterCenter) handle(id int64) {
 	for datagram := range r.gramChannel[id] {
-		r.logger.Info("recived ", datagram)
+		if datagram.Data.Title == LINK || datagram.Data.Title == LINK_SUBMIT || datagram.Data.Title == FIND_LINK {
+			r.logger.Info("reveived:", datagram)
+		}
 		conn := r.socketPool[id]
 		if conn == nil {
 			return
@@ -596,7 +598,9 @@ func (r *RegisterCenter) post(conn net.Conn, title PostTitle, data interface{}, 
 			Body:      data,
 		},
 	}
-	r.logger.Info("send : ", datagram)
+	if datagram.Data.Title == LINK || datagram.Data.Title == LINK_SUBMIT || datagram.Data.Title == FIND_LINK {
+		r.logger.Info("post:", datagram)
+	}
 	bytes, err := datagram.Package()
 	if err != nil {
 		r.logger.Error(err.Error())

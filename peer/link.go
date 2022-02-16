@@ -55,7 +55,7 @@ func UnPackage(bytes []byte) (LinkGram, error) {
 //  @param token
 //  @param port
 //
-func createLink(logger *logrus.Logger, token string, port string, logClient *core.LogClient) *Link {
+func (p *Peer) createLink(logger *logrus.Logger, token string, port string, logClient *core.LogClient, key string) {
 	link := Link{
 		logger:     logger,
 		logClient:  logClient,
@@ -64,8 +64,8 @@ func createLink(logger *logrus.Logger, token string, port string, logClient *cor
 		LinkFields: make([]LinkField, 0),
 		DataField:  make([]interface{}, 0),
 	}
+	p.Links[key] = &link
 	go link.linkListen(port)
-	return &link
 }
 
 //

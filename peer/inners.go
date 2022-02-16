@@ -128,6 +128,9 @@ func (p *Peer) unpacking() {
 //
 func (p *Peer) handle() {
 	for data := range p.gramChannel {
+		if data.Data.Title == core.LINK || data.Data.Title == core.LINK_SUBMIT || data.Data.Title == core.FIND_LINK {
+			p.logger.Info("receive:", data)
+		}
 		switch data.Data.Title {
 		case core.IS_ACTIVE:
 			{
@@ -264,9 +267,7 @@ func (p *Peer) handleLinkSubmit(data core.DataGram) {
 		go p.LogClient.Report(core.Log_Error, err.Error())
 		return
 	}
-	delete(p.LinkApplys, info.Key)
-	link := createLink(p.logger, info.Token, info.Port, p.LogClient)
-	p.Links[info.Key] = link
+	p.createLink(p.logger, info.Token, info.Port, p.LogClient, info.Key)
 }
 
 //
@@ -310,7 +311,10 @@ func (p *Peer) post(data core.DataGram) error {
 		return errors.New("no conn found")
 	}
 	_, err = p.connection.Write(bytes)
-	p.logger.Info("post:", string(bytes))
+	if data.Data.Title == core.LINK || data.Data.Title == core.LINK_SUBMIT || data.Data.Title == core.FIND_LINK {
+		p.logger.Info("post:", string(bytes))
+	}
+
 	if err != nil {
 		return err
 	}
