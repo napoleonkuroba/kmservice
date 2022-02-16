@@ -657,6 +657,7 @@ func (r *RegisterCenter) resend() {
 					delete(r.pendingList, key)
 					continue
 				}
+				r.logger.Info("resend:", key, item.Message)
 				item.Conn.Write(bytes)
 			}
 			item.Time = time.Now()
