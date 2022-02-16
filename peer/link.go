@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/hducqa/kmservice/core"
 	"github.com/sirupsen/logrus"
+	"log"
 	"math/rand"
 	"net"
 	"time"
@@ -81,7 +82,7 @@ func (l *Link) linkListen(port string) {
 		go l.logClient.Report(core.Log_Error, err.Error())
 		return
 	}
-	l.logger.Info("TCP listening on port :" + port)
+	log.Print("TCP listening on port :" + port)
 	for {
 		if l.LinkNumber > MaxLinkNumber {
 			time.Sleep(10 * time.Second)

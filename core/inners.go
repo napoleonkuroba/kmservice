@@ -229,7 +229,7 @@ func (r *RegisterCenter) unpacking(id int64) {
 					if dataGram.Data.Title == CONFIRM {
 						delete(r.pendingList, dataGram.CenterTag)
 					} else {
-						r.post(r.socketPool[id], CONFIRM, dataGram.Tag, DefaultTag, DefaultInt, DefaultInt, false)
+						r.post(r.socketPool[id], CONFIRM, nil, dataGram.Tag, DefaultInt, DefaultInt, false)
 						r.gramChannel[id] <- dataGram
 					}
 				}
@@ -287,9 +287,6 @@ func (r *RegisterCenter) listen(id int64) {
 //
 func (r *RegisterCenter) handle(id int64) {
 	for datagram := range r.gramChannel[id] {
-		if datagram.Data.Title == LINK || datagram.Data.Title == LINK_SUBMIT || datagram.Data.Title == FIND_LINK {
-			r.logger.Info("reveived:", datagram)
-		}
 		conn := r.socketPool[id]
 		if conn == nil {
 			return
@@ -598,9 +595,6 @@ func (r *RegisterCenter) post(conn net.Conn, title PostTitle, data interface{}, 
 			Body:      data,
 		},
 	}
-	if datagram.Data.Title == LINK || datagram.Data.Title == LINK_SUBMIT || datagram.Data.Title == FIND_LINK {
-		r.logger.Info("post:", datagram)
-	}
 	bytes, err := datagram.Package()
 	if err != nil {
 		r.logger.Error(err.Error())
@@ -661,7 +655,6 @@ func (r *RegisterCenter) resend() {
 					delete(r.pendingList, key)
 					continue
 				}
-				r.logger.Info("resend:", key, item.Message)
 				item.Conn.Write(bytes)
 			}
 			item.Time = time.Now()
