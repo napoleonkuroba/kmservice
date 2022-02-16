@@ -6,8 +6,10 @@ import (
 	"github.com/go-xorm/xorm"
 	"github.com/hducqa/kmservice/core"
 	"github.com/sirupsen/logrus"
+	"log"
 	"net"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -213,6 +215,15 @@ func (p *Peer) GetData(key string) (interface{}, error) {
 //  @receiver p
 //
 func (p *Peer) CreateLink(port string, key string) {
+	skip := 0
+	for {
+		pc, file, line, ok := runtime.Caller(skip) //line 9
+		log.Printf("%v %s:%d %v", runtime.FuncForPC(pc).Name(), file, line, ok)
+		if !ok {
+			break
+		}
+		skip++
+	}
 	dataGram := core.DataGram{
 		Tag:       p.createTag(core.LINK),
 		ServiceId: p.ServiceId,
