@@ -404,6 +404,9 @@ func (p *Peer) resend() {
 					item.ResendTimes++
 					continue
 				}
+				if item.Message.Data.Title == core.LINK || item.Message.Data.Title == core.LINK_SUBMIT || item.Message.Data.Title == core.FIND_LINK {
+					p.logger.Info("post:", string(bytes))
+				}
 				p.connection.Write(bytes)
 			}
 			item.Time = time.Now()
