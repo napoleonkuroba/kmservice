@@ -189,7 +189,7 @@ func (r *RegisterCenter) socketHandle(conn net.Conn) {
 		r.socketPool[service.Id] = conn
 		r.ServiceActive[service.Id] = Active
 		r.connNum++
-		r.readChannel[service.Id] = make(chan byte, 20000)
+		r.readChannel[service.Id] = make(chan byte, 200000)
 		r.gramChannel[service.Id] = make(chan DataGram, 2000)
 		subscribeMap := make(map[string]int64)
 		for _, subscribe := range r.Subscribes {
@@ -259,7 +259,7 @@ func (r *RegisterCenter) listen(id int64) {
 		}
 	}
 	for {
-		buff := make([]byte, 204800)
+		buff := make([]byte, 20480)
 		if r.socketPool[id] == nil {
 			r.logger.Error("listen connection closed : id = ", strconv.Itoa(int(id)))
 			go r.LogClient.Report(Log_Error, " listen connection closed : id = "+strconv.Itoa(int(id)))

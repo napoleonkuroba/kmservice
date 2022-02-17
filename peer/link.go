@@ -2,7 +2,6 @@ package peer
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/hducqa/kmservice/core"
 	"github.com/sirupsen/logrus"
 	"log"
@@ -113,7 +112,7 @@ func (l *Link) linkListen(port string) {
 			conn.Close()
 			return
 		}
-		fmt.Println(apply.Desc)
+		log.Print("link :", apply.Desc)
 		l.LinkFields = append(l.LinkFields, LinkField{
 			stop:          false,
 			conn:          conn,
@@ -269,7 +268,7 @@ func (l *LinkField) listen() {
 			go l.logClient.Report(core.Log_Error, "connection closed")
 			return
 		}
-		buff := make([]byte, 2048)
+		buff := make([]byte, 204800)
 		length, err := l.conn.Read(buff)
 		if err != nil {
 			l.logger.Error(err.Error())
