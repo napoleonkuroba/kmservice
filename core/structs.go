@@ -87,7 +87,14 @@ type RegisterCenter struct {
 	updateChannel      chan UpdatePackage //数据更新通道
 	rLocker            map[int64]bool     //读数据锁
 
-	pendingList map[string]PendingItem
+	pendingList    map[string]PendingItem
+	pendingChannel chan PendingChannelItem
+}
+
+type PendingChannelItem struct {
+	Delete bool
+	Tag    string
+	Item   PendingItem
 }
 
 type PendingItem struct {

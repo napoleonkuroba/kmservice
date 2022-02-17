@@ -50,7 +50,6 @@ func NewPeer(config PeerConfig, logSql *xorm.Engine, logger *logrus.Logger, maxe
 		getList:           make(map[int64]bool),
 		updateRequestList: make(map[int64]int),
 		subscribeKeys:     make(map[string]int64),
-		pendingList:       make(map[string]PendingGram),
 		LinkInfos:         make(map[string]core.LinkInfo),
 		Links:             make(map[string]*Link),
 		logger:            logger,
@@ -63,6 +62,9 @@ func NewPeer(config PeerConfig, logSql *xorm.Engine, logger *logrus.Logger, maxe
 		connection:    nil,
 		errorTimes:    10,
 		filePath:      persistencePath,
+
+		pendingList:    make(map[string]PendingGram),
+		pendingChannel: make(chan PendingChannelItem, 100),
 	}
 }
 
@@ -73,6 +75,7 @@ func NewPeer(config PeerConfig, logSql *xorm.Engine, logger *logrus.Logger, maxe
 //
 func (p *Peer) Run() {
 	go p.resend()
+	go p.resendHandle()
 	p.connect()
 }
 
@@ -315,7 +318,7 @@ func (p *Peer) Link(key string, desc string) *Link {
 			conn:          conn,
 			DataChannel:   make(chan interface{}, 2000),
 			CustomChannel: make(chan LinkGram, 2000),
-			pending:       make(map[string]PendingLinkGram),
+			pendingList:   make(map[string]PendingLinkGram),
 			logger:        p.logger,
 			logClient:     p.LogClient,
 		})

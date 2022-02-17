@@ -30,7 +30,9 @@ type Peer struct {
 	getList           map[int64]bool
 	updateRequestList map[int64]int //订阅更新申请状态，1为申请中，2为申请成功，-1为申请失败,0为可申请
 	subscribeKeys     map[string]int64
-	pendingList       map[string]PendingGram //等待队列
+
+	pendingList    map[string]PendingGram //等待队列
+	pendingChannel chan PendingChannelItem
 
 	LinkInfos map[string]core.LinkInfo //连接配置
 
@@ -58,6 +60,12 @@ type PeerConfig struct {
 	FilePath    string `json:"peer_file_path"`
 }
 
+type PendingChannelItem struct {
+	Delete bool
+	Tag    string
+	Item   PendingGram
+}
+
 type PendingGram struct {
 	Time        time.Time
 	ResendTimes int
@@ -81,18 +89,26 @@ type LinkField struct {
 	conn          net.Conn
 	DataChannel   chan interface{}
 	CustomChannel chan LinkGram
-	pending       map[string]PendingLinkGram
 	logger        *logrus.Logger
 	logClient     *core.LogClient
 
 	readChannel chan byte
 	gramChannel chan LinkGram
+
+	pendingList    map[string]PendingLinkGram
+	pendingChannel chan PendingLinkChannelItem
 }
 
 type PendingLinkGram struct {
 	linkGram    LinkGram
 	resendTimes int
 	Time        time.Time
+}
+
+type PendingLinkChannelItem struct {
+	Delete bool
+	Tag    string
+	Item   PendingLinkGram
 }
 
 type Link struct {

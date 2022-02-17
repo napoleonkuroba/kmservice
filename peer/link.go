@@ -118,7 +118,7 @@ func (l *Link) linkListen(port string) {
 			conn:          conn,
 			DataChannel:   make(chan interface{}, 2000),
 			CustomChannel: make(chan LinkGram, 2000),
-			pending:       make(map[string]PendingLinkGram),
+			pendingList:   make(map[string]PendingLinkGram),
 			logger:        l.logger,
 			logClient:     l.logClient,
 			readChannel:   make(chan byte, 20000),
@@ -155,12 +155,15 @@ func (l *LinkField) post(data LinkGram, resend bool) {
 		return
 	}
 	if resend {
-		l.pending[data.Tag] = PendingLinkGram{
-			linkGram:    data,
-			resendTimes: 0,
+		l.pendingChannel <- PendingLinkChannelItem{
+			Delete: false,
+			Tag:    data.Tag,
+			Item: PendingLinkGram{
+				linkGram:    data,
+				resendTimes: 0,
+			},
 		}
 	}
-	l.logger.Info("push data : ", data)
 	return
 }
 
@@ -191,6 +194,7 @@ func (l *LinkField) AccelerateLink() {
 	go l.unpacking()
 	go l.handle()
 	go l.resend()
+	go l.resendHandle()
 	for data := range l.DataChannel {
 		for {
 			if l.stop {
@@ -225,19 +229,36 @@ func (l *LinkField) POST(linkType LinkType, customKey string, data interface{}, 
 
 //
 //  resend
-//  @Description: 重发数据报
+//  @Description: 处理重发请求
 //  @receiver l
-//  @param logger
 //
 func (l *LinkField) resend() {
+	for item := range l.pendingChannel {
+		if item.Delete {
+			delete(l.pendingList, item.Tag)
+		} else {
+			l.pendingList[item.Tag] = item.Item
+		}
+	}
+}
+
+//
+//  resendHandle
+//  @Description: 重发数据报
+//  @receiver l
+//
+func (l *LinkField) resendHandle() {
 	for {
 		time.Sleep(1 * time.Minute)
-		for key, item := range l.pending {
+		for key, item := range l.pendingList {
 			if item.resendTimes > MaxResendTimes {
 				l.logger.Error("the datagram has sent to many times : ", item.linkGram)
 				bytes, _ := item.linkGram.Package()
 				go l.logClient.Report(core.Log_Error, "the datagram has sent to many times : "+string(bytes))
-				delete(l.pending, key)
+				l.pendingChannel <- PendingLinkChannelItem{
+					Delete: true,
+					Tag:    key,
+				}
 				continue
 			}
 			subTime := time.Now().Sub(item.Time).Minutes()
@@ -302,7 +323,10 @@ func (l *LinkField) unpacking() {
 					go l.logClient.Report(core.Log_Error, err.Error())
 				} else {
 					if linkGram.Type == CONFIRM {
-						delete(l.pending, linkGram.Tag)
+						l.pendingChannel <- PendingLinkChannelItem{
+							Delete: true,
+							Tag:    linkGram.Tag,
+						}
 					} else {
 						l.post(LinkGram{
 							Tag:       linkGram.Tag,

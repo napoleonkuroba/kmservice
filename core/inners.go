@@ -227,7 +227,10 @@ func (r *RegisterCenter) unpacking(id int64) {
 					go r.LogClient.Report(Log_Error, err.Error())
 				} else {
 					if dataGram.Data.Title == CONFIRM {
-						delete(r.pendingList, dataGram.CenterTag)
+						r.pendingChannel <- PendingChannelItem{
+							Delete: true,
+							Tag:    dataGram.CenterTag,
+						}
 					} else {
 						r.post(r.socketPool[id], CONFIRM, nil, dataGram.Tag, DefaultInt, DefaultInt, false)
 						r.gramChannel[id] <- dataGram
@@ -614,21 +617,40 @@ func (r *RegisterCenter) post(conn net.Conn, title PostTitle, data interface{}, 
 		go r.LogClient.Report(Log_Error, err.Error())
 	}
 	if resend {
-		r.pendingList[centerTag] = PendingItem{
-			Time:        time.Now(),
-			ResendTimes: 0,
-			Message:     datagram,
-			Conn:        conn,
+		r.pendingChannel <- PendingChannelItem{
+			Delete: false,
+			Tag:    centerTag,
+			Item: PendingItem{
+				Time:        time.Now(),
+				ResendTimes: 0,
+				Message:     datagram,
+				Conn:        conn,
+			},
 		}
 	}
 }
 
 //
 //  resend
-//  @Description: 重发机制
+//  @Description: 利用通道处理重发请求
 //  @receiver r
 //
 func (r *RegisterCenter) resend() {
+	for item := range r.pendingChannel {
+		if item.Delete {
+			delete(r.pendingList, item.Tag)
+		} else {
+			r.pendingList[item.Tag] = item.Item
+		}
+	}
+}
+
+//
+//  resendHandle
+//  @Description: 重发机制
+//  @receiver r
+//
+func (r *RegisterCenter) resendHandle() {
 	for {
 		time.Sleep(1 * time.Minute)
 		for key, item := range r.pendingList {
@@ -636,7 +658,10 @@ func (r *RegisterCenter) resend() {
 				r.logger.Error("the datagram has sent to many times : ", item.Message)
 				bytes, _ := item.Message.Package()
 				go r.LogClient.Report(Log_Error, "the datagram has sent to many times : "+string(bytes))
-				delete(r.pendingList, key)
+				r.pendingChannel <- PendingChannelItem{
+					Delete: true,
+					Tag:    key,
+				}
 				continue
 			}
 			subTime := time.Now().Sub(item.Time).Minutes()
@@ -652,7 +677,10 @@ func (r *RegisterCenter) resend() {
 				if item.Conn == nil {
 					r.logger.Error("conn closed : ", item.Message)
 					go r.LogClient.Report(Log_Error, "conn closed  : "+string(bytes))
-					delete(r.pendingList, key)
+					r.pendingChannel <- PendingChannelItem{
+						Delete: true,
+						Tag:    key,
+					}
 					continue
 				}
 				item.Conn.Write(bytes)

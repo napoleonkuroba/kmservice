@@ -97,7 +97,10 @@ func (p *Peer) unpacking() {
 					go p.LogClient.Report(core.Log_Error, err.Error())
 				} else {
 					if dataGram.Data.Title == core.CONFIRM {
-						delete(p.pendingList, dataGram.Tag)
+						p.pendingChannel <- PendingChannelItem{
+							Delete: true,
+							Tag:    dataGram.Tag,
+						}
 					} else {
 						p.post(core.DataGram{
 							Tag:       p.createTag(core.CONFIRM),
@@ -321,10 +324,14 @@ func (p *Peer) post(data core.DataGram) error {
 		}()
 	}
 	if data.Data.Title != core.CONFIRM {
-		p.pendingList[data.Tag] = PendingGram{
-			Time:        time.Now(),
-			ResendTimes: 0,
-			Message:     data,
+		p.pendingChannel <- PendingChannelItem{
+			Delete: false,
+			Tag:    data.Tag,
+			Item: PendingGram{
+				Time:        time.Now(),
+				ResendTimes: 0,
+				Message:     data,
+			},
 		}
 	}
 	return nil
@@ -373,10 +380,25 @@ func (p *Peer) get(key int64) error {
 
 //
 //  resend
-//  @Description: 检测并重发数据报
+//  @Description: 使用通道处理重发请求
 //  @receiver p
 //
 func (p *Peer) resend() {
+	for item := range p.pendingChannel {
+		if item.Delete {
+			delete(p.pendingList, item.Tag)
+		} else {
+			p.pendingList[item.Tag] = item.Item
+		}
+	}
+}
+
+//
+//  resendHandle
+//  @Description: 检测并重发数据报
+//  @receiver p
+//
+func (p *Peer) resendHandle() {
 	for {
 		time.Sleep(1 * time.Minute)
 		for key, item := range p.pendingList {
@@ -384,7 +406,10 @@ func (p *Peer) resend() {
 				p.logger.Error("the datagram has sent to many times : ", item.Message)
 				bytes, _ := json.Marshal(item.Message)
 				go p.LogClient.Report(core.Log_Error, "the datagram has sent to many times : "+string(bytes))
-				delete(p.pendingList, key)
+				p.pendingChannel <- PendingChannelItem{
+					Delete: true,
+					Tag:    key,
+				}
 				continue
 			}
 			subTime := time.Now().Sub(item.Time).Minutes()
