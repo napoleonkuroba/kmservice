@@ -531,7 +531,7 @@ func (l *LogClient) GetLogs() ([]Log, error) {
 //
 func (r *RegisterCenter) GetSQLConfigTable() []SqlConfig {
 	configs := make([]SqlConfig, 0)
-	err := r.SqlClient.Find(&configs)
+	err := r.LogClient.SqlClient.Find(&configs)
 	if err != nil {
 		r.logger.Error(err.Error())
 	}

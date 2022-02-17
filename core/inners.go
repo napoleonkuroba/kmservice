@@ -605,7 +605,7 @@ func (r *RegisterCenter) post(conn net.Conn, title PostTitle, data interface{}, 
 		return
 	}
 	if conn == nil {
-		r.logger.Error("no conn found")
+		r.logger.Error("no conn found", datagram)
 		go r.LogClient.Report(Log_Error, "no conn found")
 		return
 	}
