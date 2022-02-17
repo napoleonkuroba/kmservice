@@ -491,15 +491,12 @@ func (r RegisterCenter) GetServicePrivileges(subscriber int64) map[int64]Subscri
 //  @param message
 //
 func (l *LogClient) Report(level string, message string) {
-	pc := make([]uintptr, 10)
-	runtime.Callers(0, pc)
-	f := runtime.FuncForPC(pc[2])
-	file, line := f.FileLine(pc[2])
+	pc, file, line, _ := runtime.Caller(1)
 	log := Log{
 		ServiceId:   l.ServiceId,
 		ServiceName: l.ServiceName,
 		Level:       level,
-		File:        file,
+		File:        runtime.FuncForPC(pc).Name() + "  " + file,
 		Line:        line,
 		Message:     message,
 		Time:        time.Now(),
