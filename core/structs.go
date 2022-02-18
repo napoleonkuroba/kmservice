@@ -62,17 +62,32 @@ const (
 	Active
 )
 
+type ReLoadType int
+
+const (
+	_ ReLoadType = iota
+	Load_SqlConfig
+	Load_Subscribe
+	Load_Service
+)
+
 type RegisterCenter struct {
 	readChannel map[int64]chan byte
 	gramChannel map[int64]chan DataGram
 
-	persistenceFilePath string                 //持久化文件路径
-	DataMap             map[int64]interface{}  //共享文件库
-	Subscribes          map[int64]Subscribe    //订阅名单
-	SqlClient           *xorm.Engine           //数据库引擎
-	ServiceCache        map[int64]MicroService //缓存所有服务基本信息
-	ServiceActive       map[int64]ServiceState //记录服务是否活跃
-	SQLConfigFile       string
+	Subscribes    map[int64]Subscribe    //订阅名单
+	ServiceCache  map[int64]MicroService //缓存所有服务基本信息
+	reLoadChannel chan ReLoadType
+
+	persistenceFilePath string                //持久化文件路径
+	DataMap             map[int64]interface{} //共享文件库
+
+	SqlClient *xorm.Engine //数据库引擎
+
+	SQLConfigFile string
+
+	ServiceActive     map[int64]ServiceState //记录服务是否活跃
+	ActiveEditChannel chan ActiveEditItem
 
 	webSocketServer *socketio.Server //websocket服务
 	logger          *logrus.Logger   //日志管理
@@ -89,6 +104,11 @@ type RegisterCenter struct {
 
 	pendingList    map[string]PendingItem
 	pendingChannel chan PendingChannelItem
+}
+
+type ActiveEditItem struct {
+	Item  int64
+	State ServiceState
 }
 
 type PendingChannelItem struct {

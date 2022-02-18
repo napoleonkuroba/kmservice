@@ -187,7 +187,10 @@ func (r *RegisterCenter) socketHandle(conn net.Conn) {
 	if service.Token == apply.Token {
 		r.post(conn, CONNECT, nil, DefaultTag, DefaultInt, DefaultInt, true)
 		r.socketPool[service.Id] = conn
-		r.ServiceActive[service.Id] = Active
+		r.ActiveEditChannel <- ActiveEditItem{
+			Item:  service.Id,
+			State: Active,
+		}
 		r.connNum++
 		r.readChannel[service.Id] = make(chan byte, 200000)
 		r.gramChannel[service.Id] = make(chan DataGram, 2000)
@@ -283,6 +286,38 @@ func (r *RegisterCenter) listen(id int64) {
 }
 
 //
+//  editServiceState
+//  @Description: 修改服务状态
+//  @receiver r
+//
+func (r *RegisterCenter) editServiceState() {
+	for item := range r.ActiveEditChannel {
+		r.ServiceActive[item.Item] = item.State
+	}
+}
+
+//
+//  loadApply
+//  @Description: 处理load申请
+//  @receiver r
+//
+func (r *RegisterCenter) loadApply() {
+	for reload := range r.reLoadChannel {
+		switch reload {
+		case Load_Service:
+			r.loadServices()
+			break
+		case Load_SqlConfig:
+			r.LoadSQLconfig()
+			break
+		case Load_Subscribe:
+			r.loadSubscribes()
+			break
+		}
+	}
+}
+
+//
 //  handle
 //  @Description: 处理微服务发送的请求
 //  @receiver r
@@ -306,7 +341,10 @@ func (r *RegisterCenter) handle(id int64) {
 			r.handleGet(conn, datagram, id)
 			continue
 		case IS_ACTIVE:
-			r.ServiceActive[datagram.ServiceId] = Active
+			r.ActiveEditChannel <- ActiveEditItem{
+				Item:  datagram.ServiceId,
+				State: Active,
+			}
 			continue
 		case API_LIST:
 			r.handleAPIlist(conn, datagram, id)
@@ -495,7 +533,7 @@ func (r RegisterCenter) handleAPIlist(conn net.Conn, datagram DataGram, id int64
 
 	service := MicroService{Id: id, APIs: apis}
 	r.SqlClient.Where("Id=?", id).Update(&service)
-	r.loadServices()
+	r.reLoadChannel <- Load_Service
 	return
 }
 
@@ -553,10 +591,16 @@ func (r *RegisterCenter) persistenceChannelData() {
 func (r *RegisterCenter) isActive(id int64) {
 	conn := r.socketPool[id]
 	if conn == nil {
-		r.ServiceActive[id] = Stop
+		r.ActiveEditChannel <- ActiveEditItem{
+			Item:  id,
+			State: Stop,
+		}
 		return
 	}
-	r.ServiceActive[id] = Pending
+	r.ActiveEditChannel <- ActiveEditItem{
+		Item:  id,
+		State: Pending,
+	}
 	r.post(conn, IS_ACTIVE, nil, DefaultTag, id, DefaultInt, true)
 }
 
@@ -611,7 +655,10 @@ func (r *RegisterCenter) post(conn net.Conn, title PostTitle, data interface{}, 
 	}
 	_, err = conn.Write(bytes)
 	if err != nil {
-		r.ServiceActive[serviceId] = Stop
+		r.ActiveEditChannel <- ActiveEditItem{
+			Item:  serviceId,
+			State: Stop,
+		}
 		conn.Close()
 		r.logger.Error(err.Error())
 		go r.LogClient.Report(Log_Error, err.Error())

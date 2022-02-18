@@ -65,13 +65,15 @@ func NewCenter(persistencePath string, logger *logrus.Logger, poolsize int, sqlC
 	center := RegisterCenter{
 		readChannel:         make(map[int64]chan byte),
 		gramChannel:         make(map[int64]chan DataGram),
+		Subscribes:          make(map[int64]Subscribe),
+		ServiceCache:        make(map[int64]MicroService),
+		reLoadChannel:       make(chan ReLoadType, 100),
 		persistenceFilePath: persistencePath,
 		DataMap:             make(map[int64]interface{}),
-		Subscribes:          make(map[int64]Subscribe),
 		SqlClient:           dataSql,
-		ServiceCache:        make(map[int64]MicroService),
-		ServiceActive:       make(map[int64]ServiceState),
 		SQLConfigFile:       sqlConfigPath,
+		ServiceActive:       make(map[int64]ServiceState),
+		ActiveEditChannel:   make(chan ActiveEditItem, 200),
 		webSocketServer:     socketio.NewServer(nil),
 		logger:              logger,
 		LogClient:           &logClient,
@@ -105,8 +107,10 @@ func NewCenter(persistencePath string, logger *logrus.Logger, poolsize int, sqlC
 //
 func (r *RegisterCenter) Run(port string) {
 	r.LoadSQLconfig()
-	r.loadSubscribes()
-	r.loadServices()
+	go r.loadApply()
+	r.reLoadChannel <- Load_Subscribe
+	r.reLoadChannel <- Load_Service
+	go r.editServiceState()
 	go r.subscribeUpdate()
 	go r.persistenceChannelData()
 	go r.timingStatusCheck()
@@ -186,7 +190,7 @@ func (r *RegisterCenter) RegisterService(service MicroService) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	r.loadServices()
+	r.reLoadChannel <- Load_Service
 	return token, nil
 }
 
@@ -202,7 +206,7 @@ func (r *RegisterCenter) CreateSubscribe(subscribe Subscribe) error {
 	if err != nil {
 		return err
 	}
-	r.loadSubscribes()
+	r.reLoadChannel <- Load_Subscribe
 	r.displaySubscribes()
 	return nil
 }
@@ -219,7 +223,7 @@ func (r *RegisterCenter) UpdateServiceInfo(service MicroService) error {
 	if err != nil {
 		return err
 	}
-	go r.loadServices()
+	r.reLoadChannel <- Load_Service
 	return nil
 }
 
@@ -235,7 +239,7 @@ func (r *RegisterCenter) UpdateSubscribeInfo(subscribe Subscribe) error {
 	if err != nil {
 		return err
 	}
-	r.loadSubscribes()
+	r.reLoadChannel <- Load_Subscribe
 	r.displaySubscribes()
 	return nil
 }
@@ -297,9 +301,12 @@ func (r *RegisterCenter) DeleteService(id int64) error {
 			r.socketPool[service.Id] = nil
 		}
 	}
-	r.ServiceActive[service.Id] = 0
-	r.loadServices()
-	r.loadSubscribes()
+	r.ActiveEditChannel <- ActiveEditItem{
+		Item:  service.Id,
+		State: 0,
+	}
+	r.reLoadChannel <- Load_Service
+	r.reLoadChannel <- Load_Subscribe
 	return nil
 }
 
@@ -347,7 +354,7 @@ func (r *RegisterCenter) Subscribe(subscriber int64, id int64) error {
 	if err != nil {
 		return err
 	}
-	r.loadSubscribes()
+	r.reLoadChannel <- Load_Subscribe
 	_, ok = r.socketPool[subscriber]
 	if ok {
 		r.post(r.socketPool[subscriber], UPDATE, r.DataMap[id], DefaultTag, DefaultInt, id, true)
