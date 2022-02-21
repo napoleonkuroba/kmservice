@@ -113,7 +113,7 @@ func (l *Link) linkListen(port string) {
 			return
 		}
 		log.Print("link :", apply.Desc)
-		l.LinkFields = append(l.LinkFields, LinkField{
+		field := LinkField{
 			stop:          false,
 			conn:          conn,
 			DataChannel:   make(chan interface{}, 2000),
@@ -123,7 +123,14 @@ func (l *Link) linkListen(port string) {
 			logClient:     l.logClient,
 			readChannel:   make(chan byte, 20000),
 			gramChannel:   make(chan LinkGram, 2000),
-		})
+		}
+		field.post(LinkGram{
+			Tag:       createTag(),
+			Type:      SUCCESS,
+			CustomKey: "",
+			Body:      nil,
+		}, true)
+		l.LinkFields = append(l.LinkFields, field)
 		l.LinkNumber++
 	}
 }
