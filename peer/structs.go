@@ -78,10 +78,10 @@ type LinkInfo struct {
 }
 
 type LinkGram struct {
-	Tag       string      `json:"tag"`
-	Type      LinkType    `json:"type"`
-	CustomKey string      `json:"customKey"`
-	Body      interface{} `json:"body"`
+	Tag       string
+	Type      LinkType
+	CustomKey string
+	Body      interface{}
 }
 
 type LinkField struct {

@@ -22,8 +22,9 @@ const ChannelScale = 1500
 //  @return error
 //
 func (l LinkGram) Package() ([]byte, error) {
+	data := l
 	result := make([]byte, 0)
-	bytes, err := json.Marshal(l)
+	bytes, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
 	}
