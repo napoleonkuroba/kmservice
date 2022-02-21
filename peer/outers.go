@@ -289,40 +289,22 @@ func (p *Peer) Link(key string, desc string) *Link {
 		return nil
 	}
 
-	//接收服务器响应
-	buff := make([]byte, 1024)
-	length, err := conn.Read(buff)
-	if err != nil {
-		p.logger.Error(err.Error())
-		go p.LogClient.Report(core.Log_Error, err.Error())
-		return nil
+	link := Link{
+		logger:     p.logger,
+		logClient:  p.LogClient,
+		Token:      info.Token,
+		LinkNumber: 0,
+		LinkFields: make([]LinkField, 0),
+		DataField:  make([]interface{}, 0),
 	}
-	var data LinkGram
-	err = json.Unmarshal(buff[:length], &data)
-	if err != nil {
-		p.logger.Error(err.Error())
-		go p.LogClient.Report(core.Log_Error, err.Error())
-		return nil
-	}
-	if data.Type == SUCCESS {
-		link := Link{
-			logger:     p.logger,
-			logClient:  p.LogClient,
-			Token:      info.Token,
-			LinkNumber: 0,
-			LinkFields: make([]LinkField, 0),
-			DataField:  make([]interface{}, 0),
-		}
-		link.LinkFields = append(link.LinkFields, LinkField{
-			stop:          false,
-			conn:          conn,
-			DataChannel:   make(chan interface{}, 2000),
-			CustomChannel: make(chan LinkGram, 2000),
-			pendingList:   make(map[string]PendingLinkGram),
-			logger:        p.logger,
-			logClient:     p.LogClient,
-		})
-		return &link
-	}
-	return nil
+	link.LinkFields = append(link.LinkFields, LinkField{
+		stop:          false,
+		conn:          conn,
+		DataChannel:   make(chan interface{}, 2000),
+		CustomChannel: make(chan LinkGram, 2000),
+		pendingList:   make(map[string]PendingLinkGram),
+		logger:        p.logger,
+		logClient:     p.LogClient,
+	})
+	return &link
 }

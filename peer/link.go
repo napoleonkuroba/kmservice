@@ -124,12 +124,6 @@ func (l *Link) linkListen(port string) {
 			readChannel:   make(chan byte, 20000),
 			gramChannel:   make(chan LinkGram, 2000),
 		}
-		field.post(LinkGram{
-			Tag:       createTag(),
-			Type:      SUCCESS,
-			CustomKey: "",
-			Body:      nil,
-		}, true)
 		l.LinkFields = append(l.LinkFields, field)
 		l.LinkNumber++
 	}
