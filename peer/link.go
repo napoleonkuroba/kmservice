@@ -356,6 +356,7 @@ func (l *LinkField) unpacking() {
 //
 func (l *LinkField) handle() {
 	for data := range l.gramChannel {
+		log.Print("received:", data)
 		switch data.Type {
 		case STOP:
 			{
