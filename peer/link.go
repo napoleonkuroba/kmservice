@@ -114,15 +114,16 @@ func (l *Link) linkListen(port string) {
 		}
 		log.Print("link :", apply.Desc)
 		field := LinkField{
-			stop:          false,
-			conn:          conn,
-			DataChannel:   make(chan interface{}, 2000),
-			CustomChannel: make(chan LinkGram, 2000),
-			pendingList:   make(map[string]PendingLinkGram),
-			logger:        l.logger,
-			logClient:     l.logClient,
-			readChannel:   make(chan byte, 20000),
-			gramChannel:   make(chan LinkGram, 2000),
+			pendingChannel: make(chan PendingLinkChannelItem, 1000),
+			stop:           false,
+			conn:           conn,
+			DataChannel:    make(chan interface{}, 2000),
+			CustomChannel:  make(chan LinkGram, 2000),
+			pendingList:    make(map[string]PendingLinkGram),
+			logger:         l.logger,
+			logClient:      l.logClient,
+			readChannel:    make(chan byte, 20000),
+			gramChannel:    make(chan LinkGram, 2000),
 		}
 		go field.AccelerateLink()
 		l.LinkFields = append(l.LinkFields, field)
