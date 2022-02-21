@@ -357,6 +357,7 @@ func (l *LinkField) unpacking() {
 //
 func (l *LinkField) handle() {
 	for data := range l.gramChannel {
+
 		switch data.Type {
 		case STOP:
 			{
@@ -370,6 +371,7 @@ func (l *LinkField) handle() {
 			}
 		case CUSTOM:
 			{
+				log.Print("received custom:", data)
 				l.CustomChannel <- data
 				continue
 			}
