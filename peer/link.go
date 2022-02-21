@@ -125,7 +125,6 @@ func (l *Link) linkListen(port string) {
 			readChannel:    make(chan byte, 20000),
 			gramChannel:    make(chan LinkGram, 2000),
 		}
-		go field.AccelerateLink()
 		l.LinkFields = append(l.LinkFields, field)
 		l.LinkNumber++
 	}
@@ -357,7 +356,6 @@ func (l *LinkField) unpacking() {
 //
 func (l *LinkField) handle() {
 	for data := range l.gramChannel {
-		log.Print("received:", data)
 		switch data.Type {
 		case STOP:
 			{
