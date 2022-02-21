@@ -127,6 +127,7 @@ func (l *Link) linkListen(port string) {
 			gramChannel:    make(chan LinkGram, 2000),
 		}
 		l.LinkFields = append(l.LinkFields, field)
+		go field.AccelerateLink()
 		l.LinkNumber++
 	}
 }
