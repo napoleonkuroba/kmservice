@@ -372,7 +372,6 @@ func (l *LinkField) handle() {
 			}
 		case CUSTOM:
 			{
-				log.Print("received custom:", data)
 				l.CustomChannel <- data
 				continue
 			}
